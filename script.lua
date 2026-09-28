@@ -1,6 +1,6 @@
 -- ==========================================
--- 🐱 แมวส้ม Script Hub - Complete Edition v12
--- (Fix Toggle Click + Move Config Up)
+-- 🐱 แมวส้ม Script Hub - Complete Edition v31
+-- (UI Guaranteed + Realistic Lighting + All Features)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -13,35 +13,166 @@ local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
 local Lighting = game:GetService("Lighting")
+local TeleportService = game:GetService("TeleportService")
+
+local hasHook = (hookmetamethod ~= nil) and (hookfunction ~= nil)
+local hasGetNamecall = (getnamecallmethod ~= nil)
 
 if LocalPlayer.PlayerGui:FindFirstChild("AnimeScriptHub") then
     LocalPlayer.PlayerGui.AnimeScriptHub:Destroy()
 end
 
 -- ==========================================
--- ✅ Config (ย้ายขึ้นบนสุด ก่อนใช้)
+-- Config
 -- ==========================================
 local Config = {
-    AimbotEnabled = false, AimPart = "Head", AimSmoothness = 0.15, FOVCircleRadius = 180,
-    BulletHomingEnabled = false, BulletSpeed = 300,
+    AimbotEnabled = false, AimPart = "Head", FOVCircleRadius = 250,
+    LockStrength = 90, WallCheck = true,
+    BulletHomingEnabled = false, BulletSpeed = 500,
     ESP_Enabled = false, ESP_Box = false, ESP_Health = false,
-    ESP_LineColor = Color3.fromRGB(255, 0, 255),
-    ESP_LineMode = "Bottom",
+    ESP_LineColor = Color3.fromRGB(255, 0, 255), ESP_LineMode = "Bottom",
     SpeedEnabled = false, SpeedValue = 16,
     FlyEnabled = false, FlySpeed = 50, FlyHeight = 10,
     SpinEnabled = false, SpinSpeed = 5,
-    AntiLagEnabled = false,
+    AntiLagEnabled = false, GraphicBoostEnabled = false, RealisticLightingEnabled = false,
     AFKEnabled = false,
+    StealEnabled = false, StealRadius = 30, ReturnDelay = 0.5,
+    FPSEnabled = false, FPSRGB = false, FPSColor = Color3.fromRGB(0, 255, 0), FPSPosition = "TopRight",
     ThemeColor = Color3.fromRGB(130, 80, 255),
     BgColor = Color3.fromRGB(20, 15, 35),
     TextColor = Color3.fromRGB(240, 240, 255),
-    TextDim = Color3.fromRGB(160, 160, 190),
-    DiscordInvite = "44YNvqhXP"
+    TextDim = Color3.fromRGB(160, 160, 190)
 }
 
+local currentLockedTarget = nil
+local espDrawings = {}
+
 -- ==========================================
--- ฟังก์ชันปลดล็อกการเคลื่อนที่
+-- ScreenGui
 -- ==========================================
+local ScreenGui = Instance.new("ScreenGui")
+ScreenGui.Name = "AnimeScriptHub"
+ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
+ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 999999
+ScreenGui.IgnoreGuiInset = true
+
+-- Drawing API
+local FOVCircle, TargetSnapLine
+pcall(function()
+    FOVCircle = Drawing.new("Circle")
+    FOVCircle.Visible = false
+    FOVCircle.Radius = Config.FOVCircleRadius
+    FOVCircle.Color = Config.ESP_LineColor
+    FOVCircle.Thickness = 1.5
+    FOVCircle.Filled = false
+    FOVCircle.Transparency = 0.8
+    TargetSnapLine = Drawing.new("Line")
+    TargetSnapLine.Color = Color3.fromRGB(255, 0, 0)
+    TargetSnapLine.Thickness = 2
+    TargetSnapLine.Transparency = 0.9
+    TargetSnapLine.Visible = false
+end)
+
+-- ==========================================
+-- SendNotification
+-- ==========================================
+local function SendNotification(title, content, duration)
+    duration = duration or 3
+    pcall(function()
+        local NotifContainer = ScreenGui:FindFirstChild("NotifContainer")
+        if not NotifContainer then
+            NotifContainer = Instance.new("Frame")
+            NotifContainer.Name = "NotifContainer"
+            NotifContainer.Size = UDim2.new(0, 260, 1, 0)
+            NotifContainer.Position = UDim2.new(1, -275, 0, 10)
+            NotifContainer.BackgroundTransparency = 1
+            NotifContainer.ZIndex = 200
+            NotifContainer.Parent = ScreenGui
+            local layout = Instance.new("UIListLayout")
+            layout.SortOrder = Enum.SortOrder.LayoutOrder
+            layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
+            layout.Padding = UDim.new(0, 8)
+            layout.Parent = NotifContainer
+        end
+        local NotifBox = Instance.new("Frame")
+        NotifBox.Size = UDim2.new(1, 0, 0, 65)
+        NotifBox.BackgroundColor3 = Config.BgColor
+        NotifBox.BackgroundTransparency = 0.15
+        NotifBox.Position = UDim2.new(1, 50, 0, 0)
+        NotifBox.ZIndex = 200
+        NotifBox.Parent = NotifContainer
+        Instance.new("UICorner", NotifBox).CornerRadius = UDim.new(0, 10)
+        local boxStroke = Instance.new("UIStroke")
+        boxStroke.Color = Config.ThemeColor
+        boxStroke.Thickness = 1.5
+        boxStroke.Transparency = 0.3
+        boxStroke.Parent = NotifBox
+        local tLabel = Instance.new("TextLabel")
+        tLabel.Size = UDim2.new(1, -50, 0, 20)
+        tLabel.Position = UDim2.new(0, 48, 0, 8)
+        tLabel.BackgroundTransparency = 1
+        tLabel.Text = title
+        tLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+        tLabel.TextSize = 14
+        tLabel.Font = Enum.Font.GothamBold
+        tLabel.TextXAlignment = Enum.TextXAlignment.Left
+        tLabel.ZIndex = 200
+        tLabel.Parent = NotifBox
+        local cLabel = Instance.new("TextLabel")
+        cLabel.Size = UDim2.new(1, -50, 0, 25)
+        cLabel.Position = UDim2.new(0, 48, 0, 28)
+        cLabel.BackgroundTransparency = 1
+        cLabel.Text = content
+        cLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
+        cLabel.TextSize = 12
+        cLabel.Font = Enum.Font.Gotham
+        cLabel.TextXAlignment = Enum.TextXAlignment.Left
+        cLabel.TextWrapped = true
+        cLabel.ZIndex = 200
+        cLabel.Parent = NotifBox
+        NotifBox:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
+        task.delay(duration, function()
+            pcall(function()
+                NotifBox:TweenPosition(UDim2.new(1, 50, 0, 0), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.3, true)
+                task.wait(0.3)
+                NotifBox:Destroy()
+            end)
+        end)
+    end)
+end
+
+-- ==========================================
+-- ฟังก์ชันช่วย
+-- ==========================================
+local function GetTargetPart(character)
+    if not character then return nil end
+    local partNames = {Config.AimPart, "Head", "UpperTorso", "Torso", "HumanoidRootPart"}
+    for _, name in ipairs(partNames) do
+        local part = character:FindFirstChild(name)
+        if part and part:IsA("BasePart") then return part end
+    end
+    return nil
+end
+
+local function HasLineOfSight(targetPart)
+    if not Config.WallCheck then return true end
+    if not targetPart then return false end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("Head") then return false end
+    local origin = char.Head.Position
+    local direction = (targetPart.Position - origin)
+    local params = RaycastParams.new()
+    params.FilterType = Enum.RaycastFilterType.Exclude
+    params.FilterDescendantsInstances = {char, targetPart.Parent}
+    params.IgnoreWater = true
+    local result = Workspace:Raycast(origin, direction, params)
+    if not result then return true end
+    if result.Instance and result.Instance:IsDescendantOf(targetPart.Parent) then return true end
+    return false
+end
+
 local function UnlockMovement()
     local char = LocalPlayer.Character
     if not char then return end
@@ -63,90 +194,91 @@ local function UnlockMovement()
     end
 end
 
-LocalPlayer.CharacterAdded:Connect(function()
-    task.wait(1)
-    UnlockMovement()
-    Config.FlyEnabled = false
-    Config.SpeedEnabled = false
-    Config.SpinEnabled = false
+local function IsTargetInFOV()
+    if not Config.BulletHomingEnabled then return false end
+    if not currentLockedTarget or not currentLockedTarget.Character then return false end
+    local targetPart = GetTargetPart(currentLockedTarget.Character)
+    if not targetPart then return false end
+    local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
+    local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
+    if not onScreen then return false end
+    local distanceFromCenter = (Vector2.new(screenPoint.X, screenPoint.Y) - screenCenter).Magnitude
+    if FOVCircle and distanceFromCenter > FOVCircle.Radius then return false end
+    if not HasLineOfSight(targetPart) then return false end
+    return true, targetPart
+end
+
+-- ==========================================
+-- FPS Counter RGB
+-- ==========================================
+local FPSLabel = Instance.new("TextLabel")
+FPSLabel.Size = UDim2.new(0, 120, 0, 30)
+FPSLabel.Position = UDim2.new(1, -130, 0, 10)
+FPSLabel.BackgroundColor3 = Config.BgColor
+FPSLabel.BackgroundTransparency = 0.3
+FPSLabel.Text = "FPS: --"
+FPSLabel.TextColor3 = Config.FPSColor
+FPSLabel.TextSize = 14
+FPSLabel.Font = Enum.Font.GothamBold
+FPSLabel.Visible = false
+FPSLabel.ZIndex = 150
+FPSLabel.Parent = ScreenGui
+Instance.new("UICorner", FPSLabel).CornerRadius = UDim.new(0, 6)
+local fpsStroke = Instance.new("UIStroke")
+fpsStroke.Color = Config.ThemeColor
+fpsStroke.Thickness = 1.5
+fpsStroke.Transparency = 0.3
+fpsStroke.Parent = FPSLabel
+
+local function HSVtoRGB(h, s, v)
+    local r, g, b
+    local i = math.floor(h * 6)
+    local f = h * 6 - i
+    local p = v * (1 - s)
+    local q = v * (1 - f * s)
+    local t = v * (1 - (1 - f) * s)
+    i = i % 6
+    if i == 0 then r, g, b = v, t, p
+    elseif i == 1 then r, g, b = q, v, p
+    elseif i == 2 then r, g, b = p, v, t
+    elseif i == 3 then r, g, b = p, q, v
+    elseif i == 4 then r, g, b = t, p, v
+    elseif i == 5 then r, g, b = v, p, q end
+    return Color3.new(r, g, b)
+end
+
+local function UpdateFPSPosition(pos)
+    Config.FPSPosition = pos
+    if pos == "TopLeft" then FPSLabel.Position = UDim2.new(0, 10, 0, 10)
+    elseif pos == "TopRight" then FPSLabel.Position = UDim2.new(1, -130, 0, 10)
+    elseif pos == "BottomLeft" then FPSLabel.Position = UDim2.new(0, 10, 1, -40)
+    elseif pos == "BottomRight" then FPSLabel.Position = UDim2.new(1, -130, 1, -40) end
+end
+
+task.spawn(function()
+    local frameCount = 0
+    local lastTime = tick()
+    local hue = 0
+    RunService.RenderStepped:Connect(function()
+        frameCount = frameCount + 1
+        local now = tick()
+        if now - lastTime >= 1 then
+            if Config.FPSEnabled then 
+                FPSLabel.Text = "FPS: " .. frameCount
+                FPSLabel.TextColor3 = Config.FPSRGB and HSVtoRGB(hue, 1, 1) or Config.FPSColor
+            end
+            frameCount = 0
+            lastTime = now
+        end
+        if Config.FPSRGB and Config.FPSEnabled then
+            hue = (hue + 0.003) % 1
+        end
+    end)
 end)
 
 -- ==========================================
--- ScreenGui
--- ==========================================
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AnimeScriptHub"
-ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
-ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
-ScreenGui.ResetOnSpawn = false
-ScreenGui.DisplayOrder = 999999
-ScreenGui.IgnoreGuiInset = true
-
--- Notification
-local function SendNotification(title, content, duration)
-    duration = duration or 3
-    local NotifContainer = ScreenGui:FindFirstChild("NotifContainer")
-    if not NotifContainer then
-        NotifContainer = Instance.new("Frame")
-        NotifContainer.Name = "NotifContainer"
-        NotifContainer.Size = UDim2.new(0, 260, 1, 0)
-        NotifContainer.Position = UDim2.new(1, -275, 0, 10)
-        NotifContainer.BackgroundTransparency = 1
-        NotifContainer.ZIndex = 200
-        NotifContainer.Parent = ScreenGui
-        local layout = Instance.new("UIListLayout")
-        layout.SortOrder = Enum.SortOrder.LayoutOrder
-        layout.VerticalAlignment = Enum.VerticalAlignment.Bottom
-        layout.Padding = UDim.new(0, 8)
-        layout.Parent = NotifContainer
-    end
-    local NotifBox = Instance.new("Frame")
-    NotifBox.Size = UDim2.new(1, 0, 0, 65)
-    NotifBox.BackgroundColor3 = Config.BgColor
-    NotifBox.BackgroundTransparency = 0.15
-    NotifBox.Position = UDim2.new(1, 50, 0, 0)
-    NotifBox.ZIndex = 200
-    NotifBox.Parent = NotifContainer
-    Instance.new("UICorner", NotifBox).CornerRadius = UDim.new(0, 10)
-    local boxStroke = Instance.new("UIStroke")
-    boxStroke.Color = Config.ThemeColor
-    boxStroke.Thickness = 1.5
-    boxStroke.Transparency = 0.3
-    boxStroke.Parent = NotifBox
-    local tLabel = Instance.new("TextLabel")
-    tLabel.Size = UDim2.new(1, -50, 0, 20)
-    tLabel.Position = UDim2.new(0, 48, 0, 8)
-    tLabel.BackgroundTransparency = 1
-    tLabel.Text = title
-    tLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
-    tLabel.TextSize = 14
-    tLabel.Font = Enum.Font.GothamBold
-    tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.ZIndex = 200
-    tLabel.Parent = NotifBox
-    local cLabel = Instance.new("TextLabel")
-    cLabel.Size = UDim2.new(1, -50, 0, 25)
-    cLabel.Position = UDim2.new(0, 48, 0, 28)
-    cLabel.BackgroundTransparency = 1
-    cLabel.Text = content
-    cLabel.TextColor3 = Color3.fromRGB(200, 200, 200)
-    cLabel.TextSize = 12
-    cLabel.Font = Enum.Font.Gotham
-    cLabel.TextXAlignment = Enum.TextXAlignment.Left
-    cLabel.TextWrapped = true
-    cLabel.ZIndex = 200
-    cLabel.Parent = NotifBox
-    NotifBox:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
-    task.delay(duration, function()
-        pcall(function()
-            NotifBox:TweenPosition(UDim2.new(1, 50, 0, 0), Enum.EasingDirection.In, Enum.EasingStyle.Quad, 0.3, true)
-            task.wait(0.3)
-            NotifBox:Destroy()
-        end)
-    end)
-end
-
 -- Loading Screen
+-- ==========================================
 local LoadingGui = Instance.new("Frame")
 LoadingGui.Size = UDim2.new(0, 360, 0, 180)
 LoadingGui.Position = UDim2.new(0.5, -180, 0.5, -90)
@@ -186,7 +318,7 @@ BarFill.Parent = BarBg
 Instance.new("UICorner", BarFill).CornerRadius = UDim.new(1, 0)
 
 -- ==========================================
--- ✅ Main Frame (สร้างก่อน ToggleButton เพื่อให้ ZIndex ถูกต้อง)
+-- Main Frame
 -- ==========================================
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 600, 0, 420)
@@ -221,7 +353,7 @@ MainOverlay.BackgroundTransparency = 0.3
 MainOverlay.ZIndex = 1
 MainOverlay.Parent = MainFrame
 
--- Header Bar
+-- Header
 local HeaderBar = Instance.new("Frame")
 HeaderBar.Size = UDim2.new(1, 0, 0, 50)
 HeaderBar.BackgroundColor3 = Config.BgColor
@@ -267,10 +399,9 @@ CloseBtn.Active = true
 CloseBtn.Parent = HeaderBar
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
 
--- Drag MainFrame
+-- Drag
 local dragging = false
 local dragStart, startPos
-
 HeaderBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
@@ -278,13 +409,11 @@ HeaderBar.InputBegan:Connect(function(input)
         startPos = MainFrame.Position
     end
 end)
-
 HeaderBar.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = false
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
@@ -312,9 +441,7 @@ ContentContainer.BackgroundTransparency = 1
 ContentContainer.ZIndex = 2
 ContentContainer.Parent = MainFrame
 
--- ==========================================
--- ✅ Toggle Button (ZIndex 100 + สร้างหลัง MainFrame)
--- ==========================================
+-- Toggle Button
 local ToggleButton = Instance.new("ImageButton")
 ToggleButton.Size = UDim2.new(0, 60, 0, 60)
 ToggleButton.Position = UDim2.new(0.05, 0, 0.4, 0)
@@ -344,22 +471,16 @@ ToggleButton.InputBegan:Connect(function(input)
         btnStartPos = ToggleButton.Position
     end
 end)
-
 ToggleButton.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         btnDragging = false
-        if not btnMoved then
-            MainFrame.Visible = not MainFrame.Visible
-        end
+        if not btnMoved then MainFrame.Visible = not MainFrame.Visible end
     end
 end)
-
 UserInputService.InputChanged:Connect(function(input)
     if btnDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - btnDragStart
-        if math.abs(delta.X) > 10 or math.abs(delta.Y) > 10 then
-            btnMoved = true
-        end
+        if math.abs(delta.X) > 10 or math.abs(delta.Y) > 10 then btnMoved = true end
         ToggleButton.Position = UDim2.new(btnStartPos.X.Scale, btnStartPos.X.Offset + delta.X, btnStartPos.Y.Scale, btnStartPos.Y.Offset + delta.Y)
     end
 end)
@@ -561,26 +682,6 @@ local function CreatePage(title)
     return page
 end
 
--- ==========================================
--- Drawing API
--- ==========================================
-local espDrawings = {}
-local currentLockedTarget = nil
-
-local FOVCircle = Drawing.new("Circle")
-FOVCircle.Visible = false
-FOVCircle.Radius = Config.FOVCircleRadius
-FOVCircle.Color = Config.ESP_LineColor
-FOVCircle.Thickness = 1.5
-FOVCircle.Filled = false
-FOVCircle.Transparency = 0.8
-
-local TargetSnapLine = Drawing.new("Line")
-TargetSnapLine.Color = Color3.fromRGB(255, 0, 0)
-TargetSnapLine.Thickness = 2
-TargetSnapLine.Transparency = 0.9
-TargetSnapLine.Visible = false
-
 local function CreateESP(player)
     if espDrawings[player] then return end
     local line = Drawing.new("Line"); line.Visible = false
@@ -599,52 +700,19 @@ local function RemoveESP(player)
 end
 Players.PlayerRemoving:Connect(RemoveESP)
 
-RunService.Stepped:Connect(function()
-    if Config.BulletHomingEnabled and currentLockedTarget and currentLockedTarget.Character then
-        local targetPart = currentLockedTarget.Character:FindFirstChild(Config.AimPart)
-        if targetPart and LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart") then
-            for _, obj in pairs(Workspace:GetChildren()) do
-                if obj:IsA("BasePart") and (obj.Name == "Bullet" or obj.Name == "Projectile" or obj.Name == "Part" or obj.Name == "Fireball") then
-                    if (obj.Position - LocalPlayer.Character.HumanoidRootPart.Position).Magnitude < 100 then
-                        obj.CFrame = CFrame.new(obj.Position, targetPart.Position)
-                        obj.Velocity = (targetPart.Position - obj.Position).Unit * Config.BulletSpeed
-                    end
-                end
-            end
-        end
-    end
-end)
-
 -- ==========================================
--- Spin Character
--- ==========================================
-RunService.RenderStepped:Connect(function()
-    if Config.SpinEnabled then
-        local char = LocalPlayer.Character
-        if char and char:FindFirstChild("HumanoidRootPart") then
-            local hrp = char.HumanoidRootPart
-            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.SpinSpeed or 5), 0)
-        end
-    end
-end)
-
--- ==========================================
--- Anti-Lag
+-- Anti-Lag / AFK / Steal (Safe)
 -- ==========================================
 local AntiLagConnection = nil
+local AFKConnection = nil
+local StealConnection = nil
 
 local function EnableAntiLag()
     pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
-    for _, v in pairs(Workspace:GetDescendants()) do
-        if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
-            pcall(function() v.Enabled = false end)
-        end
-    end
     pcall(function()
         Lighting.GlobalShadows = false
         Lighting.FogEnd = 9e9
         Lighting.Brightness = 0
-        Lighting.Outlines = false
     end)
     AntiLagConnection = RunService.Heartbeat:Connect(function()
         if not Config.AntiLagEnabled then
@@ -668,11 +736,6 @@ local function DisableAntiLag()
     if AntiLagConnection then AntiLagConnection:Disconnect(); AntiLagConnection = nil end
 end
 
--- ==========================================
--- AFK
--- ==========================================
-local AFKConnection = nil
-
 local function EnableAFK()
     AFKConnection = RunService.Heartbeat:Connect(function()
         if not Config.AFKEnabled then
@@ -692,40 +755,399 @@ local function DisableAFK()
     if AFKConnection then AFKConnection:Disconnect(); AFKConnection = nil end
 end
 
+local function FindNearestObject()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local hrp = char.HumanoidRootPart
+    local nearest = nil
+    local shortest = Config.StealRadius
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
+            if part and part ~= hrp then
+                local name = string.lower(obj.Name)
+                if string.find(name, "egg") or string.find(name, "steal") or string.find(name, "coin") or
+                   string.find(name, "gem") or string.find(name, "cash") or string.find(name, "money") or
+                   string.find(name, "collect") or string.find(name, "orb") or string.find(name, "star") or
+                   string.find(name, "reward") or string.find(name, "drop") or string.find(name, "chest") then
+                    local dist = (part.Position - hrp.Position).Magnitude
+                    if dist < shortest then
+                        shortest = dist
+                        nearest = part
+                    end
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function StartSteal()
+    StealConnection = task.spawn(function()
+        while Config.StealEnabled do
+            task.wait(0.1)
+            local char = LocalPlayer.Character
+            if not char or not char:FindFirstChild("HumanoidRootPart") then continue end
+            local hrp = char.HumanoidRootPart
+            local originalCFrame = hrp.CFrame
+            local target = FindNearestObject()
+            if target then
+                pcall(function() hrp.CFrame = CFrame.new(target.Position) end)
+                task.wait(Config.ReturnDelay)
+                pcall(function() hrp.CFrame = originalCFrame end)
+            end
+        end
+    end)
+end
+
+local function StopSteal()
+    Config.StealEnabled = false
+    if StealConnection then
+        pcall(function() task.cancel(StealConnection) end)
+        StealConnection = nil
+    end
+end
+
+-- ==========================================
+-- ✨ Realistic Lighting (แสงเงาสมจริง)
+-- ==========================================
+local RealisticEffects = {}
+
+local function EnableRealisticLighting()
+    pcall(function()
+        -- ✅ เพิ่มแสงเงาสมจริง
+        local colorCorrection = Instance.new("ColorCorrectionEffect")
+        colorCorrection.Name = "Realistic_ColorCorrection"
+        colorCorrection.Brightness = 0.02
+        colorCorrection.Contrast = 0.15
+        colorCorrection.Saturation = 0.25
+        colorCorrection.TintColor = Color3.fromRGB(255, 250, 245)
+        colorCorrection.Parent = Lighting
+        table.insert(RealisticEffects, colorCorrection)
+        
+        local bloom = Instance.new("BloomEffect")
+        bloom.Name = "Realistic_Bloom"
+        bloom.Intensity = 1.2
+        bloom.Size = 20
+        bloom.Threshold = 0.9
+        bloom.Parent = Lighting
+        table.insert(RealisticEffects, bloom)
+        
+        local sunRays = Instance.new("SunRaysEffect")
+        sunRays.Name = "Realistic_SunRays"
+        sunRays.Intensity = 0.1
+        sunRays.Spread = 1
+        sunRays.Parent = Lighting
+        table.insert(RealisticEffects, sunRays)
+        
+        local depthOfField = Instance.new("DepthOfFieldEffect")
+        depthOfField.Name = "Realistic_DepthOfField"
+        depthOfField.FarIntensity = 0.1
+        depthOfField.FocusDistance = 30
+        depthOfField.InFocusRadius = 25
+        depthOfField.NearIntensity = 0.05
+        depthOfField.Parent = Lighting
+        table.insert(RealisticEffects, depthOfField)
+        
+        local atmosphere = Instance.new("Atmosphere")
+        atmosphere.Name = "Realistic_Atmosphere"
+        atmosphere.Density = 0.35
+        atmosphere.Offset = 0.2
+        atmosphere.Color = Color3.fromRGB(199, 199, 199)
+        atmosphere.Decay = Color3.fromRGB(106, 112, 125)
+        atmosphere.Glare = 0.6
+        atmosphere.Haze = 1.8
+        atmosphere.Parent = Lighting
+        table.insert(RealisticEffects, atmosphere)
+        
+        -- ✅ ปรับ Lighting ให้สมจริง
+        Lighting.GlobalShadows = true
+        Lighting.FogEnd = 9e9
+        Lighting.FogStart = 0
+        Lighting.Brightness = 2.5
+        Lighting.Outlines = false
+        Lighting.Ambient = Color3.fromRGB(70, 70, 70)
+        Lighting.OutdoorAmbient = Color3.fromRGB(128, 128, 128)
+        Lighting.EnvironmentDiffuseScale = 0.5
+        Lighting.EnvironmentSpecularScale = 0.5
+        Lighting.ClockTime = 14
+        Lighting.GeographicLatitude = 0
+        Lighting.ShadowSoftness = 0.5
+        
+        -- ✅ เพิ่มแสงจากพื้นหลัง
+        local sky = Lighting:FindFirstChildOfClass("Sky")
+        if not sky then
+            sky = Instance.new("Sky")
+            sky.Name = "Realistic_Sky"
+            sky.SkyboxBk = "rbxassetid://159454299"
+            sky.SkyboxDn = "rbxassetid://159454296"
+            sky.SkyboxFt = "rbxassetid://159454293"
+            sky.SkyboxLf = "rbxassetid://159454286"
+            sky.SkyboxRt = "rbxassetid://159454300"
+            sky.SkyboxUp = "rbxassetid://159454288"
+            sky.Parent = Lighting
+            table.insert(RealisticEffects, sky)
+        end
+    end)
+    SendNotification("Realistic Lighting", "เปิดแล้ว - แสงเงาสมจริง!", 3)
+end
+
+local function DisableRealisticLighting()
+    for _, effect in pairs(RealisticEffects) do
+        pcall(function() effect:Destroy() end)
+    end
+    RealisticEffects = {}
+    SendNotification("Realistic Lighting", "ปิดโหมดแสงเงาสมจริง", 2)
+end
+
+-- ==========================================
+-- Silent Aim Hooks
+-- ==========================================
+if hasHook and hasGetNamecall then
+    pcall(function()
+        local oldNamecall
+        oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
+            local ok, inFOV, targetPart = pcall(IsTargetInFOV)
+            if ok and inFOV and targetPart then
+                local method = getnamecallmethod()
+                if method == "FireServer" or method == "InvokeServer" then
+                    local args = {...}
+                    local modified = false
+                    for i, arg in pairs(args) do
+                        if typeof(arg) == "CFrame" then args[i] = CFrame.new(arg.Position, targetPart.Position); modified = true
+                        elseif typeof(arg) == "Vector3" then args[i] = targetPart.Position; modified = true
+                        end
+                    end
+                    if modified then return oldNamecall(self, unpack(args)) end
+                end
+            end
+            return oldNamecall(self, ...)
+        end)
+    end)
+end
+
+if hasHook then
+    pcall(function()
+        local oldIndex
+        oldIndex = hookmetamethod(game, "__index", function(self, key)
+            local ok, inFOV, targetPart = pcall(IsTargetInFOV)
+            if ok and inFOV and targetPart then
+                if self == LocalPlayer:GetMouse() then
+                    if key == "Hit" or key == "Target" then return CFrame.new(targetPart.Position) end
+                    if key == "UnitRay" then return Ray.new(Camera.CFrame.Position, (targetPart.Position - Camera.CFrame.Position).Unit * 1000) end
+                end
+            end
+            return oldIndex(self, key)
+        end)
+    end)
+end
+
+if hasHook and Raycast then
+    pcall(function()
+        local oldRaycast = Raycast
+        Raycast = function(origin, direction, params)
+            local ok, inFOV, targetPart = pcall(IsTargetInFOV)
+            if ok and inFOV and targetPart then
+                return oldRaycast(origin, (targetPart.Position - origin).Unit * 1000, params)
+            end
+            return oldRaycast(origin, direction, params)
+        end
+    end)
+end
+
+if hasHook then
+    pcall(function()
+        local oldWorkspaceRaycast = Workspace.Raycast
+        Workspace.Raycast = function(self, origin, direction, params)
+            local ok, inFOV, targetPart = pcall(IsTargetInFOV)
+            if ok and inFOV and targetPart then
+                return oldWorkspaceRaycast(self, origin, (targetPart.Position - origin).Unit * 1000, params)
+            end
+            return oldWorkspaceRaycast(self, origin, direction, params)
+        end
+    end)
+end
+
 -- ==========================================
 -- เมนู: หน้าหลัก
 -- ==========================================
 CreateSidebarButton("🏠 หน้าหลัก", 1, function()
     local page = CreatePage("หน้าหลัก")
+    
     CreateToggle(page, "🎯 ล็อกเป้าหมาย (Aimbot)", "AimbotEnabled", false, function(state)
-        FOVCircle.Visible = state
-        if not state then TargetSnapLine.Visible = false; currentLockedTarget = nil end
+        if FOVCircle then FOVCircle.Visible = state end
+        if not state then 
+            if TargetSnapLine then TargetSnapLine.Visible = false end
+            currentLockedTarget = nil 
+        end
     end)
-    local modeBtn = Instance.new("TextButton")
-    modeBtn.Size = UDim2.new(1, 0, 0, 35)
-    modeBtn.BackgroundColor3 = Config.BgColor
-    modeBtn.BackgroundTransparency = 0.5
-    modeBtn.Text = "โหมดล็อก: " .. Config.AimPart
-    modeBtn.TextColor3 = Config.TextColor
-    modeBtn.TextSize = 14
-    modeBtn.Font = Enum.Font.Gotham
-    modeBtn.ZIndex = 6
-    modeBtn.Active = true
-    modeBtn.Parent = page
-    Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 8)
-    modeBtn.MouseButton1Click:Connect(function()
+    
+    local aimModeBtn = Instance.new("TextButton")
+    aimModeBtn.Size = UDim2.new(1, 0, 0, 35)
+    aimModeBtn.BackgroundColor3 = Config.ThemeColor
+    aimModeBtn.Text = "🎯 โหมดล็อก: " .. (Config.AimPart == "Head" and "หัว" or "ตัว")
+    aimModeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    aimModeBtn.TextSize = 14
+    aimModeBtn.Font = Enum.Font.GothamBold
+    aimModeBtn.ZIndex = 6
+    aimModeBtn.Active = true
+    aimModeBtn.Parent = page
+    Instance.new("UICorner", aimModeBtn).CornerRadius = UDim.new(0, 8)
+    aimModeBtn.MouseButton1Click:Connect(function()
         Config.AimPart = (Config.AimPart == "Head") and "HumanoidRootPart" or "Head"
-        modeBtn.Text = "โหมดล็อก: " .. Config.AimPart
+        aimModeBtn.Text = "🎯 โหมดล็อก: " .. (Config.AimPart == "Head" and "หัว" or "ตัว")
     end)
-    CreateSlider(page, "ขนาด FOV กลางจอ", 50, 400, "FOVCircleRadius", 180, function(value) FOVCircle.Radius = value end)
-    CreateToggle(page, "🚀 กระสุนติดตามเป้า", "BulletHomingEnabled", false, function(state) end)
-    CreateSlider(page, "ความเร็วกระสุน", 100, 1000, "BulletSpeed", 300, function(value) end)
+    
+    CreateSlider(page, "📡 ขนาด FOV กลางจอ", 50, 500, "FOVCircleRadius", 250, function(value)
+        if FOVCircle then FOVCircle.Radius = value end
+    end)
+    
+    CreateSlider(page, "🔒 ความแรงล็อก (0=นุ่ม, 100=Snap)", 0, 100, "LockStrength", 90, function(value)
+        Config.LockStrength = value
+    end)
+    
+    CreateToggle(page, "🧱 ไม่ล็อกผ่านกำแพง (Wall Check)", "WallCheck", true, function(state) end)
+    CreateToggle(page, "🚀 กระสุนติดตามเป้า (Silent Aim)", "BulletHomingEnabled", false, function(state)
+        if FOVCircle then FOVCircle.Visible = state end
+    end)
+    CreateSlider(page, "⚡ ความเร็วกระสุน", 100, 1500, "BulletSpeed", 500, function(value) end)
+end)
+
+-- ==========================================
+-- เมนู: ขโมยของ
+-- ==========================================
+CreateSidebarButton("🥚 ขโมยของ", 2, function()
+    local page = CreatePage("ขโมยของ (Steal)")
+    
+    local info = Instance.new("TextLabel")
+    info.Size = UDim2.new(1, 0, 0, 50)
+    info.BackgroundTransparency = 1
+    info.Text = "ระบบขโมยของ: วาปไปเก็บของแล้วกลับมาที่เดิม"
+    info.TextColor3 = Config.TextDim
+    info.TextSize = 12
+    info.Font = Enum.Font.Gotham
+    info.TextWrapped = true
+    info.ZIndex = 3
+    info.Parent = page
+    
+    CreateToggle(page, "🥚 เปิด/ปิด ขโมยของอัตโนมัติ", "StealEnabled", false, function(state)
+        if state then StartSteal() else StopSteal() end
+    end)
+    CreateSlider(page, "📦 รัศมีขโมย", 10, 200, "StealRadius", 30, function(value) Config.StealRadius = value end)
+    CreateSlider(page, "⏱️ ดีเลย์ก่อนวาปกลับ (วินาที)", 0, 3, "ReturnDelay", 0.5, function(value) Config.ReturnDelay = value end)
+    CreateButton(page, "🔄 สแกนหาของใกล้ตัว (ครั้งเดียว)", function()
+        local target = FindNearestObject()
+        if target then
+            local char = LocalPlayer.Character
+            if char and char:FindFirstChild("HumanoidRootPart") then
+                char.HumanoidRootPart.CFrame = CFrame.new(target.Position)
+            end
+        end
+    end)
+end)
+
+-- ==========================================
+-- เมนู: ผู้เล่น
+-- ==========================================
+CreateSidebarButton("👥 ผู้เล่น", 3, function()
+    local page = CreatePage("รายชื่อผู้เล่น & วาป")
+    local refreshBtn = Instance.new("TextButton")
+    refreshBtn.Size = UDim2.new(1, 0, 0, 35)
+    refreshBtn.BackgroundColor3 = Config.ThemeColor
+    refreshBtn.Text = "🔄 รีเฟรชรายชื่อผู้เล่น"
+    refreshBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    refreshBtn.TextSize = 14
+    refreshBtn.Font = Enum.Font.GothamBold
+    refreshBtn.ZIndex = 6
+    refreshBtn.Active = true
+    refreshBtn.Parent = page
+    Instance.new("UICorner", refreshBtn).CornerRadius = UDim.new(0, 8)
+    
+    local playerListFrame = Instance.new("Frame")
+    playerListFrame.Size = UDim2.new(1, 0, 0, 350)
+    playerListFrame.BackgroundColor3 = Config.BgColor
+    playerListFrame.BackgroundTransparency = 0.7
+    playerListFrame.ZIndex = 3
+    playerListFrame.Parent = page
+    Instance.new("UICorner", playerListFrame).CornerRadius = UDim.new(0, 8)
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 5)
+    listLayout.Parent = playerListFrame
+    
+    local function RefreshPlayerList()
+        for _, v in pairs(playerListFrame:GetChildren()) do
+            if v:IsA("Frame") then v:Destroy() end
+        end
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local row = Instance.new("Frame")
+                row.Size = UDim2.new(1, -10, 0, 40)
+                row.Position = UDim2.new(0, 5, 0, 0)
+                row.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+                row.ZIndex = 4
+                row.Parent = playerListFrame
+                Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Size = UDim2.new(0.5, 0, 1, 0)
+                nameLabel.Position = UDim2.new(0, 5, 0, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Text = player.Name
+                nameLabel.TextColor3 = Config.TextColor
+                nameLabel.TextSize = 12
+                nameLabel.Font = Enum.Font.Gotham
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.ZIndex = 5
+                nameLabel.Parent = row
+                local tpBtn = Instance.new("TextButton")
+                tpBtn.Size = UDim2.new(0, 50, 0, 28)
+                tpBtn.Position = UDim2.new(0.55, 0, 0.5, -14)
+                tpBtn.BackgroundColor3 = Color3.fromRGB(80, 120, 255)
+                tpBtn.Text = "วาป"
+                tpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                tpBtn.TextSize = 12
+                tpBtn.Font = Enum.Font.GothamBold
+                tpBtn.ZIndex = 5
+                tpBtn.Active = true
+                tpBtn.Parent = row
+                Instance.new("UICorner", tpBtn).CornerRadius = UDim.new(0, 4)
+                tpBtn.MouseButton1Click:Connect(function()
+                    local char = LocalPlayer.Character
+                    if char and char:FindFirstChild("HumanoidRootPart") and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+                        char.HumanoidRootPart.CFrame = player.Character.HumanoidRootPart.CFrame + Vector3.new(3, 0, 3)
+                    end
+                end)
+                local resetBtn = Instance.new("TextButton")
+                resetBtn.Size = UDim2.new(0, 50, 0, 28)
+                resetBtn.Position = UDim2.new(0.75, 0, 0.5, -14)
+                resetBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+                resetBtn.Text = "รี"
+                resetBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                resetBtn.TextSize = 12
+                resetBtn.Font = Enum.Font.GothamBold
+                resetBtn.ZIndex = 5
+                resetBtn.Active = true
+                resetBtn.Parent = row
+                Instance.new("UICorner", resetBtn).CornerRadius = UDim.new(0, 4)
+                resetBtn.MouseButton1Click:Connect(function()
+                    if player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+                        player.Character:FindFirstChildOfClass("Humanoid").Health = 0
+                    end
+                end)
+            end
+        end
+    end
+    refreshBtn.MouseButton1Click:Connect(RefreshPlayerList)
+    Players.PlayerAdded:Connect(function() task.wait(0.5); RefreshPlayerList() end)
+    Players.PlayerRemoving:Connect(function() task.wait(0.5); RefreshPlayerList() end)
+    task.wait(0.1)
+    RefreshPlayerList()
 end)
 
 -- ==========================================
 -- เมนู: ผู้เล่น/บิน
 -- ==========================================
-CreateSidebarButton("👤 ผู้เล่น/บิน", 2, function()
+CreateSidebarButton("👤 ผู้เล่น/บิน", 4, function()
     local page = CreatePage("ผู้เล่น & การเคลื่อนที่")
     CreateToggle(page, "วิ่งเร็ว", "SpeedEnabled", false, function(state)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
@@ -759,20 +1181,17 @@ CreateSidebarButton("👤 ผู้เล่น/บิน", 2, function()
             end
         end
     end)
-    CreateToggle(page, "🌀 หมุนตัว (Spin)", "SpinEnabled", false, function(state)
-        SendNotification("หมุนตัว", state and "เปิดการหมุนตัวแล้ว" or "ปิดการหมุนตัวแล้ว", 2)
-    end)
+    CreateToggle(page, "🌀 หมุนตัว (Spin)", "SpinEnabled", false, function(state) end)
     CreateSlider(page, "ความเร็วหมุน", 1, 30, "SpinSpeed", 5, function(value) end)
     CreateButton(page, "🔓 ปลดล็อกการเคลื่อนที่", function()
         UnlockMovement()
-        SendNotification("ปลดล็อก", "ตัวละครกลับมาเดินได้ปกติแล้ว", 2)
     end)
 end)
 
 -- ==========================================
 -- เมนู: เส้นมอง
 -- ==========================================
-CreateSidebarButton("👁️ เส้นมอง", 3, function()
+CreateSidebarButton("👁️ เส้นมอง", 5, function()
     local page = CreatePage("เส้นมอง (ESP)")
     CreateToggle(page, "เปิด/ปิด เส้นมอง (Tracer)", "ESP_Enabled", false, function(state) end)
     CreateToggle(page, "เปิด/ปิด กล่องรอบตัว (Box)", "ESP_Box", false, function(state) end)
@@ -792,7 +1211,6 @@ CreateSidebarButton("👁️ เส้นมอง", 3, function()
     modeBtn.MouseButton1Click:Connect(function()
         Config.ESP_LineMode = (Config.ESP_LineMode == "Top") and "Bottom" or "Top"
         modeBtn.Text = "📍 ตำแหน่งเส้น: " .. (Config.ESP_LineMode == "Top" and "ด้านบน" or "ด้านล่าง")
-        SendNotification("ตำแหน่งเส้น", "เปลี่ยนเป็น: " .. (Config.ESP_LineMode == "Top" and "ด้านบน" or "ด้านล่าง"), 2)
     end)
     local colorBtn = Instance.new("TextButton")
     colorBtn.Size = UDim2.new(1, 0, 0, 35)
@@ -814,19 +1232,19 @@ CreateSidebarButton("👁️ เส้นมอง", 3, function()
         local newColor = colors[math.random(1, #colors)]
         Config.ESP_LineColor = newColor
         colorBtn.BackgroundColor3 = newColor
-        FOVCircle.Color = newColor
+        if FOVCircle then FOVCircle.Color = newColor end
     end)
 end)
 
 -- ==========================================
 -- เมนู: ตั้งค่า
 -- ==========================================
-CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
+CreateSidebarButton("⚙️ ตั้งค่า", 6, function()
     local page = CreatePage("ตั้งค่า")
     local infoLabel = Instance.new("TextLabel")
-    infoLabel.Size = UDim2.new(1, 0, 0, 50)
+    infoLabel.Size = UDim2.new(1, 0, 0, 60)
     infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "🐱 แมวส้ม Script Hub\nเวอร์ชัน: 12.0"
+    infoLabel.Text = "🐱 แมวส้ม Script Hub\nเวอร์ชัน: 31.0\nHook: " .. (hasHook and "✅ รองรับ" or "❌ ไม่รองรับ")
     infoLabel.TextColor3 = Config.TextDim
     infoLabel.TextSize = 12
     infoLabel.Font = Enum.Font.Gotham
@@ -835,36 +1253,13 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
     infoLabel.ZIndex = 3
     infoLabel.Parent = page
     
-    CreateToggle(page, "⚡ แก้กระตุก (Anti-Lag)", "AntiLagEnabled", false, function(state)
-        if state then EnableAntiLag(); SendNotification("Anti-Lag", "เปิดโหมดลดกระตุกแล้ว", 2)
-        else DisableAntiLag(); SendNotification("Anti-Lag", "ปิดโหมดลดกระตุกแล้ว", 2) end
+    -- ✅ Realistic Lighting
+    CreateToggle(page, "🌅 แสงเงาสมจริง (Realistic Lighting)", "RealisticLightingEnabled", false, function(state)
+        if state then EnableRealisticLighting() else DisableRealisticLighting() end
     end)
     
-    CreateToggle(page, "💤 AFK (กันเตะ)", "AFKEnabled", false, function(state)
-        if state then EnableAFK(); SendNotification("AFK", "เปิดโหมดกันเตะแล้ว", 2)
-        else DisableAFK(); SendNotification("AFK", "ปิดโหมดกันเตะแล้ว", 2) end
-    end)
-    
-    CreateButton(page, "💬 เข้าดิสคอร์ด", function()
-        local inviteCode = Config.DiscordInvite
-        local inviteUrl = "https://discord.gg/" .. inviteCode
-        pcall(function() setclipboard(inviteUrl) end)
-        local opened = false
-        pcall(function() if openUrl then openUrl(inviteUrl); opened = true end end)
-        if not opened then pcall(function() if launchApp then launchApp("discord"); opened = true end end) end
-        if not opened then
-            pcall(function()
-                if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
-                    local intent = "intent://discord.gg/" .. inviteCode .. "#Intent;scheme=https;package=com.discord;end"
-                    if request then request({Url = intent, Method = "GET"}); opened = true end
-                end
-            end)
-        end
-        if not opened then pcall(function() GuiService:OpenBrowserWindow(inviteUrl) end) end
-        SendNotification("Discord", opened and "กำลังเปิด Discord..." or "คัดลอกลิงก์แล้ว!", 3)
-    end)
-    
-    CreateButton(page, "🔍 ค้นหาเซิร์ฟเวอร์ว่าง", function()
+    -- Server Finder
+    CreateButton(page, "🔍 ค้นหาเซิร์ฟเวอร์ว่าง (1 คน)", function()
         SendNotification("Server Finder", "กำลังค้นหา...", 2)
         local ServerFrame = Instance.new("Frame")
         ServerFrame.Size = UDim2.new(0, 400, 0, 300)
@@ -896,7 +1291,6 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
         sfClose.TextSize = 16
         sfClose.Font = Enum.Font.GothamBold
         sfClose.ZIndex = 51
-        sfClose.Active = true
         sfClose.Parent = ServerFrame
         Instance.new("UICorner", sfClose).CornerRadius = UDim.new(0, 6)
         sfClose.MouseButton1Click:Connect(function() ServerFrame:Destroy() end)
@@ -931,7 +1325,6 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
                             serverBtn.Font = Enum.Font.Gotham
                             serverBtn.TextXAlignment = Enum.TextXAlignment.Left
                             serverBtn.ZIndex = 52
-                            serverBtn.Active = true
                             serverBtn.Parent = sfScroll
                             Instance.new("UICorner", serverBtn).CornerRadius = UDim.new(0, 6)
                             local joinBtn = Instance.new("TextButton")
@@ -943,12 +1336,11 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
                             joinBtn.TextSize = 12
                             joinBtn.Font = Enum.Font.GothamBold
                             joinBtn.ZIndex = 53
-                            joinBtn.Active = true
                             joinBtn.Parent = serverBtn
                             Instance.new("UICorner", joinBtn).CornerRadius = UDim.new(0, 4)
                             joinBtn.MouseButton1Click:Connect(function()
                                 pcall(function()
-                                    game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                                    TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
                                 end)
                             end)
                             if found >= 10 then break end
@@ -973,6 +1365,47 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
         end)
     end)
     
+    CreateButton(page, "🔄 รีจอยเซิร์ฟเวอร์ 1 คน", function()
+        SendNotification("Rejoin", "กำลังค้นหา...", 2)
+        task.spawn(function()
+            local cursor = ""
+            while true do
+                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100&cursor=" .. cursor
+                local success, result = pcall(function() return game:HttpGet(url) end)
+                if success then
+                    local data = HttpService:JSONDecode(result)
+                    for _, server in pairs(data.data) do
+                        if server.playing == 1 then
+                            pcall(function()
+                                TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
+                            end)
+                            return
+                        end
+                    end
+                    cursor = data.nextPageCursor or ""
+                    if cursor == "" then break end
+                else break end
+                task.wait(0.5)
+            end
+            SendNotification("Rejoin", "ไม่พบเซิร์ฟเวอร์ 1 คน", 3)
+        end)
+    end)
+    
+    -- Anti-Lag
+    CreateToggle(page, "⚡ แก้กระตุก (Anti-Lag)", "AntiLagEnabled", false, function(state)
+        if state then EnableAntiLag() else DisableAntiLag() end
+    end)
+    
+    CreateToggle(page, "💤 AFK (กันเตะ)", "AFKEnabled", false, function(state)
+        if state then EnableAFK() else DisableAFK() end
+    end)
+    
+    CreateToggle(page, "📊 แสดง FPS", "FPSEnabled", false, function(state)
+        FPSLabel.Visible = state
+    end)
+    
+    CreateToggle(page, "🌈 FPS สี RGB", "FPSRGB", false, function(state) end)
+    
     CreateButton(page, "❌ ทำลาย UI ทั้งหมด", function()
         if FOVCircle then FOVCircle:Remove() end
         if TargetSnapLine then TargetSnapLine:Remove() end
@@ -991,15 +1424,15 @@ if firstBtn and firstBtn:IsA("TextButton") then firstBtn.MouseButton1Click:Fire(
 -- ==========================================
 RunService.RenderStepped:Connect(function()
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
-    FOVCircle.Position = screenCenter
+    if FOVCircle then FOVCircle.Position = screenCenter end
 
     local closestPlayer = nil
     if Config.AimbotEnabled then
-        local shortestDistance = FOVCircle.Radius
+        local shortestDistance = FOVCircle and FOVCircle.Radius or 250
         for _, player in pairs(Players:GetPlayers()) do
             if player ~= LocalPlayer and player.Character and player.Character:FindFirstChild("Humanoid") and player.Character.Humanoid.Health > 0 then
-                local targetPart = player.Character:FindFirstChild(Config.AimPart)
-                if targetPart then
+                local targetPart = GetTargetPart(player.Character)
+                if targetPart and HasLineOfSight(targetPart) then
                     local screenPoint, onScreen = Camera:WorldToViewportPoint(targetPart.Position)
                     if onScreen then
                         local distance = (Vector2.new(screenPoint.X, screenPoint.Y) - screenCenter).Magnitude
@@ -1012,21 +1445,36 @@ RunService.RenderStepped:Connect(function()
             end
         end
         currentLockedTarget = closestPlayer
-        if closestPlayer and closestPlayer.Character and closestPlayer.Character:FindFirstChild(Config.AimPart) then
-            local targetPos = closestPlayer.Character[Config.AimPart].Position
-            Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), Config.AimSmoothness)
-            local headScreen = Camera:WorldToViewportPoint(closestPlayer.Character[Config.AimPart].Position)
-            TargetSnapLine.From = screenCenter
-            TargetSnapLine.To = Vector2.new(headScreen.X, headScreen.Y)
-            TargetSnapLine.Visible = true
+        
+        if closestPlayer and closestPlayer.Character then
+            local targetPart = GetTargetPart(closestPlayer.Character)
+            if targetPart then
+                local targetPos = targetPart.Position
+                if Config.LockStrength >= 99 then
+                    Camera.CFrame = CFrame.new(Camera.CFrame.Position, targetPos)
+                else
+                    local lockSmoothness = 1 - (Config.LockStrength / 100)
+                    local aimSpeed = math.clamp(1 - lockSmoothness, 0.05, 1)
+                    Camera.CFrame = Camera.CFrame:Lerp(CFrame.new(Camera.CFrame.Position, targetPos), aimSpeed)
+                end
+                if TargetSnapLine then
+                    local headScreen = Camera:WorldToViewportPoint(targetPos)
+                    TargetSnapLine.From = screenCenter
+                    TargetSnapLine.To = Vector2.new(headScreen.X, headScreen.Y)
+                    TargetSnapLine.Visible = true
+                end
+            else
+                if TargetSnapLine then TargetSnapLine.Visible = false end
+            end
         else
-            TargetSnapLine.Visible = false
+            if TargetSnapLine then TargetSnapLine.Visible = false end
         end
     else
-        TargetSnapLine.Visible = false
+        if TargetSnapLine then TargetSnapLine.Visible = false end
         currentLockedTarget = nil
     end
 
+    -- ESP Loop
     for _, player in pairs(Players:GetPlayers()) do
         if player ~= LocalPlayer then
             if Config.ESP_Enabled or Config.ESP_Box then
@@ -1107,10 +1555,13 @@ end)
 -- โหลดเสร็จ
 -- ==========================================
 task.spawn(function()
-    BarFill:TweenSize(UDim2.new(1, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 1.5, true)
-    task.wait(1.5)
+    task.wait(0.5)
+    if BarFill then
+        BarFill:TweenSize(UDim2.new(1, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 1, true)
+    end
+    task.wait(1)
     if LoadingGui then LoadingGui:Destroy() end
-    ToggleButton.Visible = true
-    MainFrame.Visible = true
-    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub พร้อมใช้งาน!", 3)
+    if ToggleButton then ToggleButton.Visible = true end
+    if MainFrame then MainFrame.Visible = true end
+    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v31 พร้อมใช้งาน!", 3)
 end)
