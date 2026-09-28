@@ -1,6 +1,6 @@
 -- ==========================================
--- 🐱 แมวส้ม Script Hub - Complete Edition v6
--- (Discord เปิดได้ทุก Injector + Fallback ครบ)
+-- 🐱 แมวส้ม Script Hub - Complete Edition v12
+-- (Fix Toggle Click + Move Config Up)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -12,11 +12,15 @@ local Camera = workspace.CurrentCamera
 local Workspace = game:GetService("Workspace")
 local HttpService = game:GetService("HttpService")
 local GuiService = game:GetService("GuiService")
+local Lighting = game:GetService("Lighting")
 
 if LocalPlayer.PlayerGui:FindFirstChild("AnimeScriptHub") then
     LocalPlayer.PlayerGui.AnimeScriptHub:Destroy()
 end
 
+-- ==========================================
+-- ✅ Config (ย้ายขึ้นบนสุด ก่อนใช้)
+-- ==========================================
 local Config = {
     AimbotEnabled = false, AimPart = "Head", AimSmoothness = 0.15, FOVCircleRadius = 180,
     BulletHomingEnabled = false, BulletSpeed = 300,
@@ -25,6 +29,9 @@ local Config = {
     ESP_LineMode = "Bottom",
     SpeedEnabled = false, SpeedValue = 16,
     FlyEnabled = false, FlySpeed = 50, FlyHeight = 10,
+    SpinEnabled = false, SpinSpeed = 5,
+    AntiLagEnabled = false,
+    AFKEnabled = false,
     ThemeColor = Color3.fromRGB(130, 80, 255),
     BgColor = Color3.fromRGB(20, 15, 35),
     TextColor = Color3.fromRGB(240, 240, 255),
@@ -32,11 +39,48 @@ local Config = {
     DiscordInvite = "44YNvqhXP"
 }
 
+-- ==========================================
+-- ฟังก์ชันปลดล็อกการเคลื่อนที่
+-- ==========================================
+local function UnlockMovement()
+    local char = LocalPlayer.Character
+    if not char then return end
+    local humanoid = char:FindFirstChildOfClass("Humanoid")
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if humanoid then
+        humanoid.PlatformStand = false
+        humanoid.WalkSpeed = 16
+        humanoid.JumpPower = 50
+        humanoid.AutoRotate = true
+        humanoid.Sit = false
+    end
+    if hrp then
+        for _, v in pairs(hrp:GetChildren()) do
+            if v:IsA("BodyGyro") or v:IsA("BodyVelocity") or v:IsA("BodyPosition") then
+                pcall(function() v:Destroy() end)
+            end
+        end
+    end
+end
+
+LocalPlayer.CharacterAdded:Connect(function()
+    task.wait(1)
+    UnlockMovement()
+    Config.FlyEnabled = false
+    Config.SpeedEnabled = false
+    Config.SpinEnabled = false
+end)
+
+-- ==========================================
+-- ScreenGui
+-- ==========================================
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AnimeScriptHub"
 ScreenGui.Parent = LocalPlayer:WaitForChild("PlayerGui")
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.ResetOnSpawn = false
+ScreenGui.DisplayOrder = 999999
+ScreenGui.IgnoreGuiInset = true
 
 -- Notification
 local function SendNotification(title, content, duration)
@@ -48,7 +92,7 @@ local function SendNotification(title, content, duration)
         NotifContainer.Size = UDim2.new(0, 260, 1, 0)
         NotifContainer.Position = UDim2.new(1, -275, 0, 10)
         NotifContainer.BackgroundTransparency = 1
-        NotifContainer.ZIndex = 20
+        NotifContainer.ZIndex = 200
         NotifContainer.Parent = ScreenGui
         local layout = Instance.new("UIListLayout")
         layout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -61,7 +105,7 @@ local function SendNotification(title, content, duration)
     NotifBox.BackgroundColor3 = Config.BgColor
     NotifBox.BackgroundTransparency = 0.15
     NotifBox.Position = UDim2.new(1, 50, 0, 0)
-    NotifBox.ZIndex = 20
+    NotifBox.ZIndex = 200
     NotifBox.Parent = NotifContainer
     Instance.new("UICorner", NotifBox).CornerRadius = UDim.new(0, 10)
     local boxStroke = Instance.new("UIStroke")
@@ -78,7 +122,7 @@ local function SendNotification(title, content, duration)
     tLabel.TextSize = 14
     tLabel.Font = Enum.Font.GothamBold
     tLabel.TextXAlignment = Enum.TextXAlignment.Left
-    tLabel.ZIndex = 20
+    tLabel.ZIndex = 200
     tLabel.Parent = NotifBox
     local cLabel = Instance.new("TextLabel")
     cLabel.Size = UDim2.new(1, -50, 0, 25)
@@ -90,7 +134,7 @@ local function SendNotification(title, content, duration)
     cLabel.Font = Enum.Font.Gotham
     cLabel.TextXAlignment = Enum.TextXAlignment.Left
     cLabel.TextWrapped = true
-    cLabel.ZIndex = 20
+    cLabel.ZIndex = 200
     cLabel.Parent = NotifBox
     NotifBox:TweenPosition(UDim2.new(0, 0, 0, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 0.3, true)
     task.delay(duration, function()
@@ -108,7 +152,7 @@ LoadingGui.Size = UDim2.new(0, 360, 0, 180)
 LoadingGui.Position = UDim2.new(0.5, -180, 0.5, -90)
 LoadingGui.BackgroundColor3 = Config.BgColor
 LoadingGui.BackgroundTransparency = 0.15
-LoadingGui.ZIndex = 15
+LoadingGui.ZIndex = 100
 LoadingGui.Parent = ScreenGui
 Instance.new("UICorner", LoadingGui).CornerRadius = UDim.new(0, 12)
 local loadStroke = Instance.new("UIStroke")
@@ -124,39 +168,26 @@ StatusText.Text = "กำลังโหลดระบบ..."
 StatusText.TextColor3 = Color3.fromRGB(255, 255, 255)
 StatusText.TextSize = 14
 StatusText.Font = Enum.Font.GothamBold
-StatusText.ZIndex = 16
+StatusText.ZIndex = 101
 StatusText.Parent = LoadingGui
 local BarBg = Instance.new("Frame")
 BarBg.Size = UDim2.new(0.8, 0, 0, 12)
 BarBg.Position = UDim2.new(0.1, 0, 0, 125)
 BarBg.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
 BarBg.BackgroundTransparency = 0.5
-BarBg.ZIndex = 16
+BarBg.ZIndex = 101
 BarBg.Parent = LoadingGui
 Instance.new("UICorner", BarBg).CornerRadius = UDim.new(1, 0)
 local BarFill = Instance.new("Frame")
 BarFill.Size = UDim2.new(0, 0, 1, 0)
 BarFill.BackgroundColor3 = Config.ThemeColor
-BarFill.ZIndex = 17
+BarFill.ZIndex = 102
 BarFill.Parent = BarBg
 Instance.new("UICorner", BarFill).CornerRadius = UDim.new(1, 0)
 
--- Toggle Button
-local ToggleButton = Instance.new("ImageButton")
-ToggleButton.Size = UDim2.new(0, 55, 0, 55)
-ToggleButton.Position = UDim2.new(0.05, 0, 0.4, 0)
-ToggleButton.BackgroundColor3 = Config.BgColor
-ToggleButton.BackgroundTransparency = 0.2
-ToggleButton.Image = "rbxassetid://103628356622817"
-ToggleButton.Visible = false
-ToggleButton.Parent = ScreenGui
-Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
-local btnStroke = Instance.new("UIStroke")
-btnStroke.Color = Config.ThemeColor
-btnStroke.Thickness = 2
-btnStroke.Parent = ToggleButton
-
--- Main Frame
+-- ==========================================
+-- ✅ Main Frame (สร้างก่อน ToggleButton เพื่อให้ ZIndex ถูกต้อง)
+-- ==========================================
 local MainFrame = Instance.new("Frame")
 MainFrame.Size = UDim2.new(0, 600, 0, 420)
 MainFrame.Position = UDim2.new(0.5, -300, 0.5, -210)
@@ -165,6 +196,7 @@ MainFrame.BackgroundTransparency = 0.15
 MainFrame.Visible = false
 MainFrame.ClipsDescendants = true
 MainFrame.ZIndex = 10
+MainFrame.Active = true
 MainFrame.Parent = ScreenGui
 Instance.new("UICorner", MainFrame).CornerRadius = UDim.new(0, 16)
 local mainStroke = Instance.new("UIStroke")
@@ -189,6 +221,7 @@ MainOverlay.BackgroundTransparency = 0.3
 MainOverlay.ZIndex = 1
 MainOverlay.Parent = MainFrame
 
+-- Header Bar
 local HeaderBar = Instance.new("Frame")
 HeaderBar.Size = UDim2.new(1, 0, 0, 50)
 HeaderBar.BackgroundColor3 = Config.BgColor
@@ -229,12 +262,15 @@ CloseBtn.Text = "X"
 CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
 CloseBtn.TextSize = 20
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.ZIndex = 3
+CloseBtn.ZIndex = 5
+CloseBtn.Active = true
 CloseBtn.Parent = HeaderBar
 CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
 
+-- Drag MainFrame
 local dragging = false
 local dragStart, startPos
+
 HeaderBar.InputBegan:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = true
@@ -242,11 +278,13 @@ HeaderBar.InputBegan:Connect(function(input)
         startPos = MainFrame.Position
     end
 end)
+
 HeaderBar.InputEnded:Connect(function(input)
     if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
         dragging = false
     end
 end)
+
 UserInputService.InputChanged:Connect(function(input)
     if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
         local delta = input.Position - dragStart
@@ -254,6 +292,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
+-- Sidebar
 local Sidebar = Instance.new("Frame")
 Sidebar.Size = UDim2.new(0, 140, 1, -50)
 Sidebar.Position = UDim2.new(0, 0, 0, 50)
@@ -273,6 +312,61 @@ ContentContainer.BackgroundTransparency = 1
 ContentContainer.ZIndex = 2
 ContentContainer.Parent = MainFrame
 
+-- ==========================================
+-- ✅ Toggle Button (ZIndex 100 + สร้างหลัง MainFrame)
+-- ==========================================
+local ToggleButton = Instance.new("ImageButton")
+ToggleButton.Size = UDim2.new(0, 60, 0, 60)
+ToggleButton.Position = UDim2.new(0.05, 0, 0.4, 0)
+ToggleButton.BackgroundColor3 = Config.BgColor
+ToggleButton.BackgroundTransparency = 0.2
+ToggleButton.Image = "rbxassetid://103628356622817"
+ToggleButton.Visible = false
+ToggleButton.Active = true
+ToggleButton.AutoButtonColor = false
+ToggleButton.ZIndex = 100
+ToggleButton.Parent = ScreenGui
+Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
+local btnStroke = Instance.new("UIStroke")
+btnStroke.Color = Config.ThemeColor
+btnStroke.Thickness = 2
+btnStroke.Parent = ToggleButton
+
+local btnDragging = false
+local btnDragStart, btnStartPos
+local btnMoved = false
+
+ToggleButton.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        btnDragging = true
+        btnMoved = false
+        btnDragStart = input.Position
+        btnStartPos = ToggleButton.Position
+    end
+end)
+
+ToggleButton.InputEnded:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        btnDragging = false
+        if not btnMoved then
+            MainFrame.Visible = not MainFrame.Visible
+        end
+    end
+end)
+
+UserInputService.InputChanged:Connect(function(input)
+    if btnDragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - btnDragStart
+        if math.abs(delta.X) > 10 or math.abs(delta.Y) > 10 then
+            btnMoved = true
+        end
+        ToggleButton.Position = UDim2.new(btnStartPos.X.Scale, btnStartPos.X.Offset + delta.X, btnStartPos.Y.Scale, btnStartPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ==========================================
+-- UI Components
+-- ==========================================
 local function CreateSidebarButton(name, order, callback)
     local btn = Instance.new("TextButton")
     btn.Size = UDim2.new(1, 0, 0, 45)
@@ -285,6 +379,7 @@ local function CreateSidebarButton(name, order, callback)
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.LayoutOrder = order
     btn.ZIndex = 3
+    btn.Active = true
     btn.Parent = Sidebar
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     local indicator = Instance.new("Frame")
@@ -335,14 +430,15 @@ local function CreateToggle(parent, text, flagName, defaultState, callback)
     toggleBtn.Position = UDim2.new(1, -45, 0.5, -12)
     toggleBtn.BackgroundColor3 = currentState and Config.ThemeColor or Color3.fromRGB(60, 55, 80)
     toggleBtn.Text = ""
-    toggleBtn.ZIndex = 3
+    toggleBtn.ZIndex = 6
+    toggleBtn.Active = true
     toggleBtn.Parent = container
     Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
     local knob = Instance.new("Frame")
     knob.Size = UDim2.new(0, 18, 0, 18)
     knob.Position = currentState and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
     knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
-    knob.ZIndex = 4
+    knob.ZIndex = 7
     knob.Parent = toggleBtn
     Instance.new("UICorner", knob).CornerRadius = UDim.new(1, 0)
     toggleBtn.MouseButton1Click:Connect(function()
@@ -395,6 +491,7 @@ local function CreateSlider(parent, text, min, max, flagName, default, callback)
     sliderBtn.BackgroundTransparency = 1
     sliderBtn.Text = ""
     sliderBtn.ZIndex = 5
+    sliderBtn.Active = true
     sliderBtn.Parent = sliderBg
     local isDragging = false
     local function updateSlider()
@@ -423,7 +520,8 @@ local function CreateButton(parent, text, callback)
     btn.TextColor3 = Color3.fromRGB(255, 255, 255)
     btn.TextSize = 14
     btn.Font = Enum.Font.GothamBold
-    btn.ZIndex = 3
+    btn.ZIndex = 6
+    btn.Active = true
     btn.Parent = parent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     btn.MouseButton1Click:Connect(callback)
@@ -463,6 +561,9 @@ local function CreatePage(title)
     return page
 end
 
+-- ==========================================
+-- Drawing API
+-- ==========================================
 local espDrawings = {}
 local currentLockedTarget = nil
 
@@ -514,6 +615,86 @@ RunService.Stepped:Connect(function()
     end
 end)
 
+-- ==========================================
+-- Spin Character
+-- ==========================================
+RunService.RenderStepped:Connect(function()
+    if Config.SpinEnabled then
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChild("HumanoidRootPart") then
+            local hrp = char.HumanoidRootPart
+            hrp.CFrame = hrp.CFrame * CFrame.Angles(0, math.rad(Config.SpinSpeed or 5), 0)
+        end
+    end
+end)
+
+-- ==========================================
+-- Anti-Lag
+-- ==========================================
+local AntiLagConnection = nil
+
+local function EnableAntiLag()
+    pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level01 end)
+    for _, v in pairs(Workspace:GetDescendants()) do
+        if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+            pcall(function() v.Enabled = false end)
+        end
+    end
+    pcall(function()
+        Lighting.GlobalShadows = false
+        Lighting.FogEnd = 9e9
+        Lighting.Brightness = 0
+        Lighting.Outlines = false
+    end)
+    AntiLagConnection = RunService.Heartbeat:Connect(function()
+        if not Config.AntiLagEnabled then
+            if AntiLagConnection then AntiLagConnection:Disconnect() end
+            return
+        end
+        for _, v in pairs(Workspace:GetDescendants()) do
+            if v:IsA("ParticleEmitter") or v:IsA("Trail") or v:IsA("Smoke") or v:IsA("Fire") or v:IsA("Sparkles") then
+                pcall(function() v.Enabled = false end)
+            end
+        end
+    end)
+end
+
+local function DisableAntiLag()
+    pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
+    pcall(function()
+        Lighting.GlobalShadows = true
+        Lighting.Brightness = 2
+    end)
+    if AntiLagConnection then AntiLagConnection:Disconnect(); AntiLagConnection = nil end
+end
+
+-- ==========================================
+-- AFK
+-- ==========================================
+local AFKConnection = nil
+
+local function EnableAFK()
+    AFKConnection = RunService.Heartbeat:Connect(function()
+        if not Config.AFKEnabled then
+            if AFKConnection then AFKConnection:Disconnect() end
+            return
+        end
+        local char = LocalPlayer.Character
+        if char and char:FindFirstChildOfClass("Humanoid") then
+            local humanoid = char:FindFirstChildOfClass("Humanoid")
+            if humanoid:GetState() == Enum.HumanoidStateType.Seated then return end
+            pcall(function() humanoid.Jump = true end)
+        end
+    end)
+end
+
+local function DisableAFK()
+    if AFKConnection then AFKConnection:Disconnect(); AFKConnection = nil end
+end
+
+-- ==========================================
+-- เมนู: หน้าหลัก
+-- ==========================================
 CreateSidebarButton("🏠 หน้าหลัก", 1, function()
     local page = CreatePage("หน้าหลัก")
     CreateToggle(page, "🎯 ล็อกเป้าหมาย (Aimbot)", "AimbotEnabled", false, function(state)
@@ -528,7 +709,8 @@ CreateSidebarButton("🏠 หน้าหลัก", 1, function()
     modeBtn.TextColor3 = Config.TextColor
     modeBtn.TextSize = 14
     modeBtn.Font = Enum.Font.Gotham
-    modeBtn.ZIndex = 3
+    modeBtn.ZIndex = 6
+    modeBtn.Active = true
     modeBtn.Parent = page
     Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 8)
     modeBtn.MouseButton1Click:Connect(function()
@@ -540,6 +722,9 @@ CreateSidebarButton("🏠 หน้าหลัก", 1, function()
     CreateSlider(page, "ความเร็วกระสุน", 100, 1000, "BulletSpeed", 300, function(value) end)
 end)
 
+-- ==========================================
+-- เมนู: ผู้เล่น/บิน
+-- ==========================================
 CreateSidebarButton("👤 ผู้เล่น/บิน", 2, function()
     local page = CreatePage("ผู้เล่น & การเคลื่อนที่")
     CreateToggle(page, "วิ่งเร็ว", "SpeedEnabled", false, function(state)
@@ -570,14 +755,23 @@ CreateSidebarButton("👤 ผู้เล่น/บิน", 2, function()
                     end
                 end)
             else
-                humanoid.PlatformStand = false
-                if hrp:FindFirstChild("MobFlyGyro") then hrp.MobFlyGyro:Destroy() end
-                if hrp:FindFirstChild("MobFlyVelocity") then hrp.MobFlyVelocity:Destroy() end
+                UnlockMovement()
             end
         end
     end)
+    CreateToggle(page, "🌀 หมุนตัว (Spin)", "SpinEnabled", false, function(state)
+        SendNotification("หมุนตัว", state and "เปิดการหมุนตัวแล้ว" or "ปิดการหมุนตัวแล้ว", 2)
+    end)
+    CreateSlider(page, "ความเร็วหมุน", 1, 30, "SpinSpeed", 5, function(value) end)
+    CreateButton(page, "🔓 ปลดล็อกการเคลื่อนที่", function()
+        UnlockMovement()
+        SendNotification("ปลดล็อก", "ตัวละครกลับมาเดินได้ปกติแล้ว", 2)
+    end)
 end)
 
+-- ==========================================
+-- เมนู: เส้นมอง
+-- ==========================================
 CreateSidebarButton("👁️ เส้นมอง", 3, function()
     local page = CreatePage("เส้นมอง (ESP)")
     CreateToggle(page, "เปิด/ปิด เส้นมอง (Tracer)", "ESP_Enabled", false, function(state) end)
@@ -591,7 +785,8 @@ CreateSidebarButton("👁️ เส้นมอง", 3, function()
     modeBtn.TextColor3 = Config.TextColor
     modeBtn.TextSize = 14
     modeBtn.Font = Enum.Font.Gotham
-    modeBtn.ZIndex = 3
+    modeBtn.ZIndex = 6
+    modeBtn.Active = true
     modeBtn.Parent = page
     Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 8)
     modeBtn.MouseButton1Click:Connect(function()
@@ -606,7 +801,8 @@ CreateSidebarButton("👁️ เส้นมอง", 3, function()
     colorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     colorBtn.TextSize = 14
     colorBtn.Font = Enum.Font.Gotham
-    colorBtn.ZIndex = 3
+    colorBtn.ZIndex = 6
+    colorBtn.Active = true
     colorBtn.Parent = page
     Instance.new("UICorner", colorBtn).CornerRadius = UDim.new(0, 8)
     colorBtn.MouseButton1Click:Connect(function()
@@ -622,12 +818,15 @@ CreateSidebarButton("👁️ เส้นมอง", 3, function()
     end)
 end)
 
+-- ==========================================
+-- เมนู: ตั้งค่า
+-- ==========================================
 CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
     local page = CreatePage("ตั้งค่า")
     local infoLabel = Instance.new("TextLabel")
     infoLabel.Size = UDim2.new(1, 0, 0, 50)
     infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "🐱 แมวส้ม Script Hub\nเวอร์ชัน: 6.0"
+    infoLabel.Text = "🐱 แมวส้ม Script Hub\nเวอร์ชัน: 12.0"
     infoLabel.TextColor3 = Config.TextDim
     infoLabel.TextSize = 12
     infoLabel.Font = Enum.Font.Gotham
@@ -636,93 +835,43 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
     infoLabel.ZIndex = 3
     infoLabel.Parent = page
     
-    -- ✅ ปุ่ม Discord เด้งเข้าแอป (Fallback 5 วิธี)
-    CreateButton(page, "💬 เข้าดิสคอร์ด (เด้งเข้าแอป)", function()
-        local inviteCode = Config.DiscordInvite
-        local inviteUrl = "https://discord.gg/" .. inviteCode
-        
-        -- คัดลอกลิงก์ไว้เผื่อฉุกเฉิน
-        pcall(function() setclipboard(inviteUrl) end)
-        
-        local opened = false
-        
-        -- วิธีที่ 1: openUrl ของ Injector (ได้ผลที่สุดบนมือถือ)
-        pcall(function()
-            if openUrl then
-                openUrl(inviteUrl)
-                opened = true
-            end
-        end)
-        
-        -- วิธีที่ 2: launchApp ของ Injector
-        if not opened then
-            pcall(function()
-                if launchApp then
-                    launchApp("discord")
-                    opened = true
-                end
-            end)
-        end
-        
-        -- วิธีที่ 3: Intent URL (Android)
-        if not opened then
-            pcall(function()
-                local isMobile = UserInputService.TouchEnabled and not UserInputService.MouseEnabled
-                if isMobile then
-                    local intent = "intent://discord.gg/" .. inviteCode .. "#Intent;scheme=https;package=com.discord;S.browser_fallback_url=" .. inviteUrl .. ";end"
-                    if request then
-                        request({Url = intent, Method = "GET"})
-                        opened = true
-                    end
-                end
-            end)
-        end
-        
-        -- วิธีที่ 4: Discord RPC (PC)
-        if not opened then
-            pcall(function()
-                local req = (syn and syn.request) or (http and http.request) or http_request
-                if req then
-                    req({
-                        Url = "http://127.0.0.1:6463/rpc?v=1",
-                        Method = "POST",
-                        Headers = {
-                            ["Content-Type"] = "application/json",
-                            ["Origin"] = "https://discord.com"
-                        },
-                        Body = HttpService:JSONEncode({
-                            cmd = "INVITE_BROWSER",
-                            args = { code = inviteCode },
-                            nonce = HttpService:GenerateGUID(false)
-                        })
-                    })
-                    opened = true
-                end
-            end)
-        end
-        
-        -- วิธีที่ 5: Fallback เปิด Browser ในตัว Roblox
-        if not opened then
-            pcall(function()
-                GuiService:OpenBrowserWindow(inviteUrl)
-            end)
-        end
-        
-        if opened then
-            SendNotification("Discord", "กำลังเปิด Discord...", 3)
-        else
-            SendNotification("Discord", "คัดลอกลิงก์แล้ว! เปิดแอป Discord เองได้เลย", 4)
-        end
+    CreateToggle(page, "⚡ แก้กระตุก (Anti-Lag)", "AntiLagEnabled", false, function(state)
+        if state then EnableAntiLag(); SendNotification("Anti-Lag", "เปิดโหมดลดกระตุกแล้ว", 2)
+        else DisableAntiLag(); SendNotification("Anti-Lag", "ปิดโหมดลดกระตุกแล้ว", 2) end
     end)
     
-    CreateButton(page, "🔍 ค้นหาเซิร์ฟเวอร์ว่าง (1 คน)", function()
+    CreateToggle(page, "💤 AFK (กันเตะ)", "AFKEnabled", false, function(state)
+        if state then EnableAFK(); SendNotification("AFK", "เปิดโหมดกันเตะแล้ว", 2)
+        else DisableAFK(); SendNotification("AFK", "ปิดโหมดกันเตะแล้ว", 2) end
+    end)
+    
+    CreateButton(page, "💬 เข้าดิสคอร์ด", function()
+        local inviteCode = Config.DiscordInvite
+        local inviteUrl = "https://discord.gg/" .. inviteCode
+        pcall(function() setclipboard(inviteUrl) end)
+        local opened = false
+        pcall(function() if openUrl then openUrl(inviteUrl); opened = true end end)
+        if not opened then pcall(function() if launchApp then launchApp("discord"); opened = true end end) end
+        if not opened then
+            pcall(function()
+                if UserInputService.TouchEnabled and not UserInputService.MouseEnabled then
+                    local intent = "intent://discord.gg/" .. inviteCode .. "#Intent;scheme=https;package=com.discord;end"
+                    if request then request({Url = intent, Method = "GET"}); opened = true end
+                end
+            end)
+        end
+        if not opened then pcall(function() GuiService:OpenBrowserWindow(inviteUrl) end) end
+        SendNotification("Discord", opened and "กำลังเปิด Discord..." or "คัดลอกลิงก์แล้ว!", 3)
+    end)
+    
+    CreateButton(page, "🔍 ค้นหาเซิร์ฟเวอร์ว่าง", function()
         SendNotification("Server Finder", "กำลังค้นหา...", 2)
         local ServerFrame = Instance.new("Frame")
         ServerFrame.Size = UDim2.new(0, 400, 0, 300)
         ServerFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
         ServerFrame.BackgroundColor3 = Config.BgColor
         ServerFrame.BackgroundTransparency = 0.1
-        ServerFrame.ZIndex = 30
+        ServerFrame.ZIndex = 50
         ServerFrame.Parent = ScreenGui
         Instance.new("UICorner", ServerFrame).CornerRadius = UDim.new(0, 12)
         local sfStroke = Instance.new("UIStroke")
@@ -736,7 +885,7 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
         sfTitle.TextColor3 = Config.TextColor
         sfTitle.TextSize = 18
         sfTitle.Font = Enum.Font.GothamBold
-        sfTitle.ZIndex = 31
+        sfTitle.ZIndex = 51
         sfTitle.Parent = ServerFrame
         local sfClose = Instance.new("TextButton")
         sfClose.Size = UDim2.new(0, 30, 0, 30)
@@ -746,7 +895,8 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
         sfClose.TextColor3 = Color3.fromRGB(255, 255, 255)
         sfClose.TextSize = 16
         sfClose.Font = Enum.Font.GothamBold
-        sfClose.ZIndex = 31
+        sfClose.ZIndex = 51
+        sfClose.Active = true
         sfClose.Parent = ServerFrame
         Instance.new("UICorner", sfClose).CornerRadius = UDim.new(0, 6)
         sfClose.MouseButton1Click:Connect(function() ServerFrame:Destroy() end)
@@ -755,7 +905,7 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
         sfScroll.Position = UDim2.new(0, 10, 0, 45)
         sfScroll.BackgroundTransparency = 1
         sfScroll.ScrollBarThickness = 3
-        sfScroll.ZIndex = 31
+        sfScroll.ZIndex = 51
         sfScroll.Parent = ServerFrame
         local sfLayout = Instance.new("UIListLayout")
         sfLayout.SortOrder = Enum.SortOrder.LayoutOrder
@@ -780,7 +930,8 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
                             serverBtn.TextSize = 12
                             serverBtn.Font = Enum.Font.Gotham
                             serverBtn.TextXAlignment = Enum.TextXAlignment.Left
-                            serverBtn.ZIndex = 32
+                            serverBtn.ZIndex = 52
+                            serverBtn.Active = true
                             serverBtn.Parent = sfScroll
                             Instance.new("UICorner", serverBtn).CornerRadius = UDim.new(0, 6)
                             local joinBtn = Instance.new("TextButton")
@@ -791,7 +942,8 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
                             joinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
                             joinBtn.TextSize = 12
                             joinBtn.Font = Enum.Font.GothamBold
-                            joinBtn.ZIndex = 33
+                            joinBtn.ZIndex = 53
+                            joinBtn.Active = true
                             joinBtn.Parent = serverBtn
                             Instance.new("UICorner", joinBtn).CornerRadius = UDim.new(0, 4)
                             joinBtn.MouseButton1Click:Connect(function()
@@ -815,35 +967,9 @@ CreateSidebarButton("⚙️ ตั้งค่า", 4, function()
                 noServer.TextColor3 = Config.TextDim
                 noServer.TextSize = 14
                 noServer.Font = Enum.Font.Gotham
-                noServer.ZIndex = 32
+                noServer.ZIndex = 52
                 noServer.Parent = sfScroll
             end
-        end)
-    end)
-    
-    CreateButton(page, "🔄 รีจอยเซิร์ฟเวอร์ 1 คน", function()
-        SendNotification("Rejoin", "กำลังค้นหา...", 2)
-        task.spawn(function()
-            local cursor = ""
-            while true do
-                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100&cursor=" .. cursor
-                local success, result = pcall(function() return game:HttpGet(url) end)
-                if success then
-                    local data = HttpService:JSONDecode(result)
-                    for _, server in pairs(data.data) do
-                        if server.playing == 1 then
-                            pcall(function()
-                                game:GetService("TeleportService"):TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
-                            end)
-                            return
-                        end
-                    end
-                    cursor = data.nextPageCursor or ""
-                    if cursor == "" then break end
-                else break end
-                task.wait(0.5)
-            end
-            SendNotification("Rejoin", "ไม่พบเซิร์ฟเวอร์ 1 คน", 3)
         end)
     end)
     
@@ -860,6 +986,9 @@ end)
 local firstBtn = Sidebar:GetChildren()[1]
 if firstBtn and firstBtn:IsA("TextButton") then firstBtn.MouseButton1Click:Fire() end
 
+-- ==========================================
+-- Main Loop
+-- ==========================================
 RunService.RenderStepped:Connect(function()
     local screenCenter = Vector2.new(Camera.ViewportSize.X / 2, Camera.ViewportSize.Y / 2)
     FOVCircle.Position = screenCenter
@@ -974,6 +1103,9 @@ RunService.RenderStepped:Connect(function()
     end
 end)
 
+-- ==========================================
+-- โหลดเสร็จ
+-- ==========================================
 task.spawn(function()
     BarFill:TweenSize(UDim2.new(1, 0, 1, 0), Enum.EasingDirection.Out, Enum.EasingStyle.Quad, 1.5, true)
     task.wait(1.5)
@@ -981,8 +1113,4 @@ task.spawn(function()
     ToggleButton.Visible = true
     MainFrame.Visible = true
     SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub พร้อมใช้งาน!", 3)
-end)
-
-ToggleButton.MouseButton1Click:Connect(function()
-    MainFrame.Visible = not MainFrame.Visible
 end)
