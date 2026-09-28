@@ -1,6 +1,6 @@
 -- ==========================================
--- 🐱 แมวส้ม Script Hub - Complete Edition v35
--- (Steal Egg + Anti-Drop + Speed 0-500 + 4K Ground)
+-- 🐱 แมวส้ม Script Hub - Complete Edition v36
+-- (4K Graphics + 4K Sky + 1s Steal + Speed 1000)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -31,13 +31,13 @@ local Config = {
     BulletHomingEnabled = false, BulletSpeed = 500,
     ESP_Enabled = false, ESP_Box = false, ESP_Health = false,
     ESP_LineColor = Color3.fromRGB(255, 0, 255), ESP_LineMode = "Bottom",
-    SpeedEnabled = false, SpeedValue = 100, SpeedBypass = true,
+    SpeedEnabled = false, SpeedValue = 500, SpeedBypass = true,
     FlyEnabled = false, FlySpeed = 50, FlyHeight = 10,
     SpinEnabled = false, SpinSpeed = 5,
-    AntiLagEnabled = false, Ground4KEnabled = false,
+    AntiLagEnabled = false, Graphics4KEnabled = false, Sky4KEnabled = false,
     AFKEnabled = false,
     AutoCollectEnabled = false, CollectRadius = 30,
-    AntiDropEnabled = false,
+    AntiDropEnabled = false, StealOnce = false, StealDelay = 1,
     FPSEnabled = false, FPSRGB = false, FPSColor = Color3.fromRGB(0, 255, 0), FPSPosition = "TopRight",
     ThemeColor = Color3.fromRGB(130, 80, 255),
     BgColor = Color3.fromRGB(20, 15, 35),
@@ -210,7 +210,7 @@ local function IsTargetInFOV()
 end
 
 -- ==========================================
--- ✅ ระบบขโมยไข่ (กดวิเดี่ยว)
+-- ✅ ระบบขโมยไข่ (กดวิเดี่ยว + 1 วิ)
 -- ==========================================
 local Stealing = false
 
@@ -238,7 +238,6 @@ local function FindNearestEgg()
     return nearest
 end
 
--- ✅ ฟังก์ชันขโมยไข่แบบกดวิเดี่ยว
 local function StealEggOnce()
     if Stealing then
         SendNotification("ขโมยไข่", "กำลังขโมยอยู่...", 2)
@@ -251,26 +250,28 @@ local function StealEggOnce()
         return
     end
     
+    Stealing = true
+    SendNotification("ขโมยไข่", "กำลังเก็บไข่... (รอ 1 วิ)", 2)
+    
+    -- รอ 1 วิ ก่อนขโมย
+    task.wait(Config.StealDelay)
+    
     local hrp = char.HumanoidRootPart
     local originalCFrame = hrp.CFrame
-    
-    -- หาไข่ที่ใกล้สุด
     local egg = FindNearestEgg()
+    
     if not egg then
-        SendNotification("ขโมยไข่", "ไม่พบไข่ในระยะ " .. Config.CollectRadius, 2)
+        SendNotification("ขโมยไข่", "ไม่พบไข่ในระยะ", 2)
+        Stealing = false
         return
     end
-    
-    Stealing = true
-    SendNotification("ขโมยไข่", "วาปไปเก็บ: " .. egg.Name, 2)
     
     -- วาปไปที่ไข่
     pcall(function()
         hrp.CFrame = CFrame.new(egg.Position)
     end)
     
-    -- รอ 0.15 วิ (ให้ Server บันทึกการเก็บ)
-    task.wait(0.15)
+    task.wait(0.1)
     
     -- วาปกลับ
     pcall(function()
@@ -284,46 +285,32 @@ end
 
 -- ✅ ระบบกันไข่ตกจากมือ
 local AntiDropConnection = nil
-
 local function EnableAntiDrop()
     AntiDropConnection = RunService.Heartbeat:Connect(function()
         if not Config.AntiDropEnabled then
             if AntiDropConnection then AntiDropConnection:Disconnect() end
             return
         end
-        
         local char = LocalPlayer.Character
         if not char then return end
-        
-        -- ตรวจสอบ Tool ในมือ
         local tool = char:FindFirstChildOfClass("Tool")
         if tool then
             local name = string.lower(tool.Name)
             if string.find(name, "egg") or string.find(name, "steal") or string.find(name, "pet") then
-                -- กันไม่ให้ Tool ถูก Unequip
                 pcall(function()
-                    if tool.Parent ~= char then
-                        tool.Parent = char
-                    end
-                end)
-                -- ล็อกตำแหน่ง
-                pcall(function()
+                    if tool.Parent ~= char then tool.Parent = char end
                     if tool:FindFirstChild("Handle") then
                         tool.Handle.CanCollide = false
                     end
                 end)
             end
         end
-        
-        -- ตรวจสอบของที่ถือ (ติดตัว)
         for _, v in pairs(char:GetChildren()) do
             if v:IsA("Tool") then
                 local name = string.lower(v.Name)
                 if string.find(name, "egg") or string.find(name, "steal") or string.find(name, "pet") then
                     pcall(function()
-                        if v.Parent ~= char then
-                            v.Parent = char
-                        end
+                        if v.Parent ~= char then v.Parent = char end
                     end)
                 end
             end
@@ -760,8 +747,8 @@ local function CreateSlider(parent, text, min, max, flagName, default, callback)
     end)
 end
 
--- ✅ TextBox Slider (ใส่ตัวเลขเอง)
-local function CreateTextBox(parent, text, flagName, default, callback)
+-- ✅ TextBox (ใส่ตัวเลขเอง)
+local function CreateTextBox(parent, text, flagName, default, maxVal, callback)
     local container = Instance.new("Frame")
     container.Size = UDim2.new(1, -20, 0, 40)
     container.BackgroundTransparency = 1
@@ -784,7 +771,7 @@ local function CreateTextBox(parent, text, flagName, default, callback)
     box.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     box.Text = tostring(currentValue)
     box.TextColor3 = Config.TextColor
-    box.PlaceholderText = "0-500"
+    box.PlaceholderText = "0-" .. maxVal
     box.Font = Enum.Font.Gotham
     box.TextSize = 14
     box.ZIndex = 6
@@ -793,7 +780,7 @@ local function CreateTextBox(parent, text, flagName, default, callback)
     box.FocusLost:Connect(function()
         local val = tonumber(box.Text)
         if val then
-            val = math.clamp(val, 0, 500)
+            val = math.clamp(val, 0, maxVal)
             Config[flagName] = val
             box.Text = tostring(val)
             if callback then callback(val) end
@@ -926,86 +913,146 @@ local function DisableAFK()
 end
 
 -- ==========================================
--- ✅ ระบบพื้น 4K
+-- ✅ ระบบภาพสวย 4K
 -- ==========================================
-local Ground4KEffects = {}
+local Graphics4KEffects = {}
 
-local function Enable4KGround()
+local function EnableGraphics4K()
     pcall(function()
-        -- เพิ่มความละเอียดของ Texture
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level10
         settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level04
         settings().Rendering.EditQualityLevel = 21
     end)
     
     pcall(function()
-        -- เพิ่มความละเอียดให้พื้น
-        for _, obj in pairs(Workspace:GetDescendants()) do
-            if obj:IsA("BasePart") and obj.Name:lower():find("ground") or obj.Name:lower():find("floor") or obj.Name:lower():find("terrain") then
-                pcall(function()
-                    obj.Material = Enum.Material.Grass
-                    obj.Reflectance = 0.1
-                end)
-            end
-        end
-    end)
-    
-    -- เพิ่ม Effect ให้ภาพสวยขึ้น
-    pcall(function()
         local cc = Instance.new("ColorCorrectionEffect")
         cc.Name = "4K_CC"
         cc.Brightness = 0.05
-        cc.Contrast = 0.2
-        cc.Saturation = 0.35
+        cc.Contrast = 0.25
+        cc.Saturation = 0.4
         cc.TintColor = Color3.fromRGB(255, 250, 245)
         cc.Parent = Lighting
-        table.insert(Ground4KEffects, cc)
+        table.insert(Graphics4KEffects, cc)
         
         local bloom = Instance.new("BloomEffect")
         bloom.Name = "4K_Bloom"
-        bloom.Intensity = 1.5
-        bloom.Size = 28
-        bloom.Threshold = 0.85
+        bloom.Intensity = 1.8
+        bloom.Size = 30
+        bloom.Threshold = 0.8
         bloom.Parent = Lighting
-        table.insert(Ground4KEffects, bloom)
+        table.insert(Graphics4KEffects, bloom)
         
         local sunRays = Instance.new("SunRaysEffect")
         sunRays.Name = "4K_SunRays"
-        sunRays.Intensity = 0.15
+        sunRays.Intensity = 0.2
         sunRays.Spread = 1
         sunRays.Parent = Lighting
-        table.insert(Ground4KEffects, sunRays)
+        table.insert(Graphics4KEffects, sunRays)
+        
+        local dof = Instance.new("DepthOfFieldEffect")
+        dof.Name = "4K_DepthOfField"
+        dof.FarIntensity = 0.1
+        dof.FocusDistance = 30
+        dof.InFocusRadius = 30
+        dof.NearIntensity = 0.05
+        dof.Parent = Lighting
+        table.insert(Graphics4KEffects, dof)
         
         local atmosphere = Instance.new("Atmosphere")
         atmosphere.Name = "4K_Atmosphere"
-        atmosphere.Density = 0.3
-        atmosphere.Offset = 0.25
+        atmosphere.Density = 0.35
+        atmosphere.Offset = 0.2
         atmosphere.Color = Color3.fromRGB(199, 199, 199)
         atmosphere.Decay = Color3.fromRGB(106, 112, 125)
-        atmosphere.Glare = 0.5
-        atmosphere.Haze = 1.5
+        atmosphere.Glare = 0.6
+        atmosphere.Haze = 1.8
         atmosphere.Parent = Lighting
-        table.insert(Ground4KEffects, atmosphere)
+        table.insert(Graphics4KEffects, atmosphere)
         
         Lighting.GlobalShadows = true
         Lighting.FogEnd = 9e9
-        Lighting.Brightness = 2.5
-        Lighting.Ambient = Color3.fromRGB(75, 75, 75)
-        Lighting.OutdoorAmbient = Color3.fromRGB(135, 135, 135)
-        Lighting.EnvironmentDiffuseScale = 0.6
-        Lighting.EnvironmentSpecularScale = 0.6
-        Lighting.ShadowSoftness = 0.4
+        Lighting.Brightness = 2.8
+        Lighting.Ambient = Color3.fromRGB(80, 80, 80)
+        Lighting.OutdoorAmbient = Color3.fromRGB(140, 140, 140)
+        Lighting.EnvironmentDiffuseScale = 0.7
+        Lighting.EnvironmentSpecularScale = 0.7
+        Lighting.ShadowSoftness = 0.5
     end)
     
-    SendNotification("4K Ground", "เปิดแล้ว - พื้นสวย 4K!", 3)
+    SendNotification("4K Graphics", "เปิดแล้ว - ภาพสวย 4K!", 3)
 end
 
-local function Disable4KGround()
-    for _, effect in pairs(Ground4KEffects) do
+local function DisableGraphics4K()
+    for _, effect in pairs(Graphics4KEffects) do
         pcall(function() effect:Destroy() end)
     end
-    Ground4KEffects = {}
-    SendNotification("4K Ground", "ปิดโหมดพื้น 4K", 2)
+    Graphics4KEffects = {}
+    SendNotification("4K Graphics", "ปิดโหมดภาพสวย 4K", 2)
+end
+
+-- ==========================================
+-- ✅ ระบบท้องฟ้าสวย 4K
+-- ==========================================
+local Sky4KEffects = {}
+
+local function EnableSky4K()
+    pcall(function()
+        -- ลบ Sky เก่า
+        for _, v in pairs(Lighting:GetChildren()) do
+            if v:IsA("Sky") then
+                v:Destroy()
+            end
+        end
+        
+        -- เพิ่ม Sky ใหม่ 4K
+        local sky = Instance.new("Sky")
+        sky.Name = "4K_Sky"
+        sky.SkyboxBk = "rbxassetid://159454299"
+        sky.SkyboxDn = "rbxassetid://159454296"
+        sky.SkyboxFt = "rbxassetid://159454293"
+        sky.SkyboxLf = "rbxassetid://159454286"
+        sky.SkyboxRt = "rbxassetid://159454300"
+        sky.SkyboxUp = "rbxassetid://159454288"
+        sky.SunAngularSize = 21
+        sky.MoonAngularSize = 11
+        sky.StarCount = 3000
+        sky.Parent = Lighting
+        table.insert(Sky4KEffects, sky)
+        
+        -- เพิ่ม Clouds สวย
+        local clouds = Instance.new("Clouds")
+        clouds.Name = "4K_Clouds"
+        clouds.Cover = 0.5
+        clouds.Density = 0.5
+        clouds.Color = Color3.fromRGB(255, 255, 255)
+        clouds.Enabled = true
+        clouds.Parent = Lighting:FindFirstChildOfClass("Atmosphere") or Lighting
+        table.insert(Sky4KEffects, clouds)
+        
+        -- ปรับ Atmosphere
+        local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
+        if not atmosphere then
+            atmosphere = Instance.new("Atmosphere")
+            atmosphere.Parent = Lighting
+        end
+        atmosphere.Density = 0.4
+        atmosphere.Offset = 0.3
+        atmosphere.Color = Color3.fromRGB(199, 199, 199)
+        atmosphere.Decay = Color3.fromRGB(106, 112, 125)
+        atmosphere.Glare = 0.8
+        atmosphere.Haze = 2
+        table.insert(Sky4KEffects, atmosphere)
+    end)
+    
+    SendNotification("4K Sky", "เปิดแล้ว - ท้องฟ้าสวย 4K!", 3)
+end
+
+local function DisableSky4K()
+    for _, effect in pairs(Sky4KEffects) do
+        pcall(function() effect:Destroy() end)
+    end
+    Sky4KEffects = {}
+    SendNotification("4K Sky", "ปิดโหมดท้องฟ้า 4K", 2)
 end
 
 -- ==========================================
@@ -1080,7 +1127,7 @@ CreateSidebarButton("🏠 หน้าหลัก", 1, function()
 end)
 
 -- ==========================================
--- ✅ เมนู: ขโมยไข่ (กดวิเดี่ยว)
+-- ✅ เมนู: ขโมยไข่ (กดวิเดี่ยว + 1 วิ)
 -- ==========================================
 CreateSidebarButton("🥚 ขโมยไข่", 2, function()
     local page = CreatePage("ขโมยไข่ (Steal Egg)")
@@ -1088,7 +1135,7 @@ CreateSidebarButton("🥚 ขโมยไข่", 2, function()
     local info = Instance.new("TextLabel")
     info.Size = UDim2.new(1, 0, 0, 60)
     info.BackgroundTransparency = 1
-    info.Text = "ระบบขโมยไข่ (กดวิเดี่ยว)\nกดปุ่ม → วาปไปเก็บไข่ → วาปกลับทันที"
+    info.Text = "ระบบขโมยไข่ (กดวิเดี่ยว)\nกดปุ่ม → รอ 1 วิ → วาปไปเก็บไข่ → วาปกลับ"
     info.TextColor3 = Config.TextDim
     info.TextSize = 12
     info.Font = Enum.Font.Gotham
@@ -1100,7 +1147,7 @@ CreateSidebarButton("🥚 ขโมยไข่", 2, function()
     local stealBtn = Instance.new("TextButton")
     stealBtn.Size = UDim2.new(1, 0, 0, 55)
     stealBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-    stealBtn.Text = "🥚 ขโมยไข่ (กด)"
+    stealBtn.Text = "🥚 ขโมยไข่ (กด - รอ 1 วิ)"
     stealBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
     stealBtn.TextSize = 16
     stealBtn.Font = Enum.Font.GothamBold
@@ -1112,11 +1159,15 @@ CreateSidebarButton("🥚 ขโมยไข่", 2, function()
         StealEggOnce()
     end)
     
+    -- ✅ Slider ปรับเวลารอ
+    CreateSlider(page, "⏱️ เวลารอก่อนขโมย (วินาที)", 1, 5, "StealDelay", 1, function(value)
+        Config.StealDelay = value
+    end)
+    
     CreateSlider(page, "📦 รัศมีขโมยไข่", 10, 200, "CollectRadius", 30, function(value)
         Config.CollectRadius = value
     end)
     
-    -- ✅ ระบบกันไข่ตกจากมือ
     CreateToggle(page, "🛡️ กันไข่ตกจากมือ (Anti-Drop)", "AntiDropEnabled", false, function(state)
         if state then 
             EnableAntiDrop()
@@ -1126,17 +1177,6 @@ CreateSidebarButton("🥚 ขโมยไข่", 2, function()
             SendNotification("Anti-Drop", "ปิด", 2)
         end
     end)
-    
-    local info2 = Instance.new("TextLabel")
-    info2.Size = UDim2.new(1, 0, 0, 40)
-    info2.BackgroundTransparency = 1
-    info2.Text = "หมายเหตุ: Anti-Drop จะล็อกไข่ที่ขโมยมาไว้ในมือ"
-    info2.TextColor3 = Color3.fromRGB(255, 200, 100)
-    info2.TextSize = 11
-    info2.Font = Enum.Font.Gotham
-    info2.TextWrapped = true
-    info2.ZIndex = 3
-    info2.Parent = page
 end)
 
 -- ==========================================
@@ -1238,19 +1278,19 @@ CreateSidebarButton("👥 ผู้เล่น", 3, function()
 end)
 
 -- ==========================================
--- ✅ เมนู: ผู้เล่น/บิน (Speed 0-500 + Bypass)
+-- ✅ เมนู: ผู้เล่น/บิน (Speed ×1000)
 -- ==========================================
 CreateSidebarButton("👤 ผู้เล่น/บิน", 4, function()
     local page = CreatePage("ผู้เล่น & การเคลื่อนที่")
     
-    -- ✅ Speed ใส่ตัวเลข 0-500
-    CreateTextBox(page, "⚡ ความเร็ววิ่ง (0-500)", "SpeedValue", 100, function(value)
+    -- ✅ Speed ใส่ตัวเลข 0-1000
+    CreateTextBox(page, "⚡ ความเร็ววิ่ง (0-1000)", "SpeedValue", 500, 1000, function(value)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
             LocalPlayer.Character.Humanoid.WalkSpeed = value
         end
     end)
     
-    CreateToggle(page, "🏃 วิ่งเร็ว", "SpeedEnabled", false, function(state)
+    CreateToggle(page, "🏃 วิ่งเร็ว ×1000", "SpeedEnabled", false, function(state)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
             LocalPlayer.Character.Humanoid.WalkSpeed = state and Config.SpeedValue or 16
         end
@@ -1259,8 +1299,8 @@ CreateSidebarButton("👤 ผู้เล่น/บิน", 4, function()
     CreateToggle(page, "🛡️ Bypass Anti-Cheat (ทุกแมพ)", "SpeedBypass", true, function(state) end)
     
     -- Fly
-    CreateSlider(page, "ความเร็วบิน", 10, 200, "FlySpeed", 50, function(value) end)
-    CreateSlider(page, "ความสูงบิน", 1, 100, "FlyHeight", 10, function(value) end)
+    CreateSlider(page, "ความเร็วบิน", 10, 500, "FlySpeed", 100, function(value) end)
+    CreateSlider(page, "ความสูงบิน", 1, 200, "FlyHeight", 20, function(value) end)
     CreateToggle(page, "🕊️ เปิด/ปิด โหมดบิน", "FlyEnabled", false, function(state)
         local char = LocalPlayer.Character
         local hrp = char and char:FindFirstChild("HumanoidRootPart")
@@ -1338,14 +1378,14 @@ CreateSidebarButton("👁️ เส้นมอง", 5, function()
 end)
 
 -- ==========================================
--- ✅ เมนู: ตั้งค่า (เพิ่ม 4K Ground)
+-- ✅ เมนู: ตั้งค่า (ภาพสวย 4K + ท้องฟ้า 4K)
 -- ==========================================
 CreateSidebarButton("⚙️ ตั้งค่า", 6, function()
     local page = CreatePage("ตั้งค่า")
     local infoLabel = Instance.new("TextLabel")
     infoLabel.Size = UDim2.new(1, 0, 0, 60)
     infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "🐱 แมวส้ม Script Hub\nเวอร์ชัน: 35.0\nHook: " .. (hasHook and "✅ รองรับ" or "❌ ไม่รองรับ")
+    infoLabel.Text = "🐱 แมวส้ม Script Hub\nเวอร์ชัน: 36.0\nHook: " .. (hasHook and "✅ รองรับ" or "❌ ไม่รองรับ")
     infoLabel.TextColor3 = Config.TextDim
     infoLabel.TextSize = 12
     infoLabel.Font = Enum.Font.Gotham
@@ -1354,9 +1394,14 @@ CreateSidebarButton("⚙️ ตั้งค่า", 6, function()
     infoLabel.ZIndex = 3
     infoLabel.Parent = page
     
-    -- ✅ 4K Ground
-    CreateToggle(page, "🎨 พื้นสวยขึ้น 4K (4K Ground)", "Ground4KEnabled", false, function(state)
-        if state then Enable4KGround() else Disable4KGround() end
+    -- ✅ ภาพสวย 4K
+    CreateToggle(page, "🎨 ภาพสวย 4K (4K Graphics)", "Graphics4KEnabled", false, function(state)
+        if state then EnableGraphics4K() else DisableGraphics4K() end
+    end)
+    
+    -- ✅ ท้องฟ้าสวย 4K
+    CreateToggle(page, "🌌 ท้องฟ้าสวย 4K (4K Sky)", "Sky4KEnabled", false, function(state)
+        if state then EnableSky4K() else DisableSky4K() end
     end)
     
     CreateButton(page, "🔍 ค้นหาเซิร์ฟเวอร์ว่าง (1 คน)", function()
@@ -1656,5 +1701,5 @@ task.spawn(function()
     if LoadingGui then LoadingGui:Destroy() end
     if ToggleButton then ToggleButton.Visible = true end
     if MainFrame then MainFrame.Visible = true end
-    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v35 พร้อมใช้งาน!", 3)
+    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v36 พร้อมใช้งาน!", 3)
 end)
