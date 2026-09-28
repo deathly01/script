@@ -2,8 +2,8 @@
 -- Robot Script Hub | Chili UI Version (Android)
 -- ==========================================
 
--- โหลดไลบรารี Chili UI (เปลี่ยนมาใช้ลิงก์ของคุณเอง)
-local Chili = loadstring(game:HttpGet("https://raw.githubusercontent.com/deathly01/script/refs/heads/main/script.lua"))()
+-- โหลดไลบรารี Chili UI (ใช้ลิงก์ไลบรารีจริงเพื่อให้ UI ทำงานได้ถูกต้อง)
+local Chili = loadstring(game:HttpGet("https://raw.githubusercontent.com/tienkhanh1/spicy/main/Chilli.lua"))()
 
 local Players = game:GetService("Players")
 local LocalPlayer = Players.LocalPlayer
