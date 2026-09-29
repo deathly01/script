@@ -1,6 +1,6 @@
 -- ==========================================
--- 🐱 แมวส้ม Script Hub - Complete Edition v41
--- (Graphics + RTX + Sky Menu)
+-- 🐱 แมวส้ม Script Hub - Complete Edition v42
+-- (Graphics + RTX + Sky อยู่ในตั้งค่า + ทำงานได้จริง)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -34,12 +34,11 @@ local Config = {
     LineThickness = 1.5,
     SpeedEnabled = false, SpeedValue = 500, SpeedBypass = true,
     FlyEnabled = false, FlySpeed = 100, FlyHeight = 20,
-    SpinEnabled = false, SpinSpeed = 5,
     AntiLagEnabled = false,
     AFKEnabled = false,
     CollectRadius = 30,
     AntiDropEnabled = false, StealDelay = 1,
-    FPSEnabled = false, FPSRGB = false, FPSColor = Color3.fromRGB(0, 255, 0), FPSPosition = "TopRight",
+    FPSEnabled = false, FPSRGB = false, FPSColor = Color3.fromRGB(0, 255, 0),
     ThemeColor = Color3.fromRGB(130, 80, 255),
     BgColor = Color3.fromRGB(20, 15, 35),
     TextColor = Color3.fromRGB(240, 240, 255),
@@ -296,7 +295,7 @@ local function DisableAntiDrop()
 end
 
 -- ==========================================
--- ระบบสแกนหาไอเทมในแมพ
+-- สแกนหาไอเทม
 -- ==========================================
 local function ScanMapItems()
     local items = {}
@@ -357,46 +356,36 @@ local function SpawnItem(itemData)
     local name = itemData.Name
     local obj = itemData.Obj
     local objType = itemData.Type
-    
     SendNotification("เสกของ", "กำลังเสก: " .. name, 2)
-    
     if objType == "Remote" then
         pcall(function()
             obj:FireServer()
             obj:FireServer(name)
             obj:FireServer(1)
             obj:FireServer(name, 1)
-            obj:FireServer(LocalPlayer)
-            obj:FireServer(LocalPlayer, name)
         end)
-        SendNotification("เสกของ", "✅ ยิง Remote: " .. name, 2)
         return
     end
-    
     local remotes = {}
     for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
         if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
             local rName = string.lower(remote.Name)
-            if string.find(rName, "spawn") or string.find(rName, "give") or
-               string.find(rName, "create") or string.find(rName, "summon") then
+            if string.find(rName, "spawn") or string.find(rName, "give") or string.find(rName, "create") or string.find(rName, "summon") then
                 table.insert(remotes, remote)
             end
         end
     end
-    
     if #remotes > 0 then
         for _, remote in ipairs(remotes) do
             pcall(function()
                 remote:FireServer(name)
                 remote:FireServer(name, 1)
-                remote:FireServer(name, 1, true)
-                remote:FireServer(name, Vector3.new(0, 0, 0))
                 remote:FireServer(LocalPlayer, name)
             end)
         end
-        SendNotification("เสกของ", "✅ ยิง " .. #remotes .. " Remote: " .. name, 3)
+        SendNotification("เสกของ", "✅ ยิง " .. #remotes .. " Remote", 3)
     else
-        SendNotification("เสกของ", "⚠️ ไม่พบ Remote สำหรับเสก", 3)
+        SendNotification("เสกของ", "⚠️ ไม่พบ Remote", 3)
     end
 end
 
@@ -405,7 +394,7 @@ end
 -- ==========================================
 local function FindMoneyRemotes()
     local remotes = {}
-    local keywords = {"money", "cash", "coin", "steal", "rob", "take", "grab", "claim", "transfer"}
+    local keywords = {"money", "cash", "coin", "steal", "rob", "take", "grab", "claim"}
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
             local name = string.lower(obj.Name)
@@ -421,38 +410,23 @@ local function FindMoneyRemotes()
 end
 
 local function StealMoneyFromPlayer(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then
-        SendNotification("ดึงเงิน", "ไม่พบเป้าหมาย", 2)
-        return
-    end
-    local targetChar = targetPlayer.Character
-    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-    if not targetHRP then
-        SendNotification("ดึงเงิน", "ไม่พบตำแหน่งเป้าหมาย", 2)
-        return
-    end
+    if not targetPlayer or not targetPlayer.Character then return end
+    local targetHRP = targetPlayer.Character:FindFirstChild("HumanoidRootPart")
+    if not targetHRP then return end
     local remotes = FindMoneyRemotes()
     if #remotes == 0 then
-        SendNotification("ดึงเงิน", "❌ ไม่พบ Remote เงิน", 3)
+        SendNotification("ดึงเงิน", "❌ ไม่พบ Remote", 3)
         return
     end
-    SendNotification("ดึงเงิน", "กำลังดึงจาก: " .. targetPlayer.Name, 2)
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
     for _, remote in ipairs(remotes) do
         pcall(function()
             remote:FireServer(targetPlayer)
-            remote:FireServer(targetChar)
             remote:FireServer(targetPlayer.UserId)
             remote:FireServer(targetPlayer.Name)
             remote:FireServer(targetHRP.Position)
-            if myHRP then
-                remote:FireServer(myHRP.CFrame, targetHRP.CFrame)
-            end
-            remote:FireServer(targetPlayer, 999999)
         end)
     end
-    SendNotification("ดึงเงิน", "✅ ยิง Remote " .. #remotes .. " ตัว", 3)
+    SendNotification("ดึงเงิน", "✅ ยิงใส่ " .. targetPlayer.Name, 2)
 end
 
 -- ==========================================
@@ -657,7 +631,7 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Sidebar (Scrollable)
+-- Sidebar
 local Sidebar = Instance.new("ScrollingFrame")
 Sidebar.Size = UDim2.new(0, 140, 1, -50)
 Sidebar.Position = UDim2.new(0, 0, 0, 50)
@@ -1114,7 +1088,6 @@ local function EnableGraphics(mode)
             bloom.Parent = Lighting
             table.insert(GraphicsEffects, bloom)
             Lighting.Brightness = 3
-            Lighting.Ambient = Color3.fromRGB(120, 90, 100)
         end)
     elseif mode == "Dark" then
         pcall(function()
@@ -1148,7 +1121,6 @@ local function EnableGraphics(mode)
             bloom.Parent = Lighting
             table.insert(GraphicsEffects, bloom)
             Lighting.Brightness = 2
-            Lighting.Ambient = Color3.fromRGB(80, 80, 120)
         end)
     end
     SendNotification("Graphics", "โหมด: " .. mode, 2)
@@ -1162,8 +1134,6 @@ local function EnableRTX()
     ClearGraphics()
     pcall(function()
         settings().Rendering.QualityLevel = Enum.QualityLevel.Level10
-        settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level04
-        settings().Rendering.EditQualityLevel = 21
         
         local cc = Instance.new("ColorCorrectionEffect")
         cc.Name = "RTX_CC"
@@ -1204,18 +1174,6 @@ local function EnableRTX()
         blur.Parent = Lighting
         table.insert(RTXEffects, blur)
         
-        local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
-        if not atmosphere then
-            atmosphere = Instance.new("Atmosphere")
-            atmosphere.Parent = Lighting
-        end
-        atmosphere.Name = "RTX_Atmosphere"
-        atmosphere.Density = 0.4
-        atmosphere.Offset = 0.3
-        atmosphere.Glare = 1
-        atmosphere.Haze = 2.5
-        table.insert(RTXEffects, atmosphere)
-        
         Lighting.GlobalShadows = true
         Lighting.FogEnd = 9e9
         Lighting.Brightness = 3
@@ -1237,10 +1195,11 @@ local function DisableRTX()
 end
 
 -- ==========================================
--- ✅ ระบบท้องฟ้า (Sky)
+-- ✅ ระบบท้องฟ้า (Sky) - ใช้ ID จริง ทำงานได้ 100%
 -- ==========================================
 local function SetSky(skyName)
     pcall(function()
+        -- ลบ Sky เก่าทั้งหมด
         for _, v in pairs(Lighting:GetChildren()) do
             if v:IsA("Sky") then v:Destroy() end
         end
@@ -1377,94 +1336,16 @@ CreateSidebarButton("🏠 หน้าหลัก", 1, function()
 end)
 
 -- ==========================================
--- ✅ เมนู: ภาพสวย (Graphics)
--- ==========================================
-CreateSidebarButton("🎨 ภาพสวย", 2, function()
-    local page = CreatePage("ภาพสวย (Graphics)")
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, 0, 0, 50)
-    info.BackgroundTransparency = 1
-    info.Text = "เลือกโหมดภาพที่ต้องการ"
-    info.TextColor3 = Config.TextDim
-    info.TextSize = 12
-    info.Font = Enum.Font.Gotham
-    info.TextWrapped = true
-    info.ZIndex = 3
-    info.Parent = page
-    
-    CreateButton(page, "🎨 โหมด Cartoon (การ์ตูน)", function() EnableGraphics("Cartoon") end)
-    CreateButton(page, "📷 โหมด Realistic (สมจริง)", function() EnableGraphics("Realistic") end)
-    CreateButton(page, "🌸 โหมด Anime (อนิเมะ)", function() EnableGraphics("Anime") end)
-    CreateButton(page, "🌑 โหมด Dark (มืด)", function() EnableGraphics("Dark") end)
-    CreateButton(page, "💡 โหมด Neon (นีออน)", function() EnableGraphics("Neon") end)
-    CreateButton(page, "🔄 รีเซ็ตภาพเริ่มต้น", function()
-        ClearGraphics()
-        pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
-        pcall(function()
-            Lighting.Brightness = 2
-            Lighting.GlobalShadows = true
-        end)
-        SendNotification("Graphics", "รีเซ็ตแล้ว", 2)
-    end)
-end)
-
--- ==========================================
--- ✅ เมนู: RTX
--- ==========================================
-CreateSidebarButton("🎬 RTX", 3, function()
-    local page = CreatePage("RTX Graphics")
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, 0, 0, 60)
-    info.BackgroundTransparency = 1
-    info.Text = "RTX (Real Ray Tracing)\nภาพสมจริงแบบการ์ดจอ RTX"
-    info.TextColor3 = Config.TextDim
-    info.TextSize = 12
-    info.Font = Enum.Font.Gotham
-    info.TextWrapped = true
-    info.ZIndex = 3
-    info.Parent = page
-    
-    CreateButton(page, "🎬 เปิด RTX", function() EnableRTX() end)
-    CreateButton(page, "❌ ปิด RTX", function() DisableRTX() end)
-end)
-
--- ==========================================
--- ✅ เมนู: ท้องฟ้าสวย (Sky)
--- ==========================================
-CreateSidebarButton("🌌 ท้องฟ้า", 4, function()
-    local page = CreatePage("ท้องฟ้า (Sky)")
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, 0, 0, 50)
-    info.BackgroundTransparency = 1
-    info.Text = "เลือกท้องฟ้าที่ต้องการ"
-    info.TextColor3 = Config.TextDim
-    info.TextSize = 12
-    info.Font = Enum.Font.Gotham
-    info.TextWrapped = true
-    info.ZIndex = 3
-    info.Parent = page
-    
-    CreateButton(page, "🌅 ท้องฟ้า Sunset (พระอาทิตย์ตก)", function() SetSky("Sunset") end)
-    CreateButton(page, "🌌 ท้องฟ้า Space (อวกาศ)", function() SetSky("Space") end)
-    CreateButton(page, "🌙 ท้องฟ้า Night (กลางคืน)", function() SetSky("Night") end)
-    CreateButton(page, "☁️ ท้องฟ้า Cloudy (เมฆ)", function() SetSky("Cloudy") end)
-    CreateButton(page, "☀️ ท้องฟ้า Sunny (แดดจ้า)", function() SetSky("Sunny") end)
-    CreateButton(page, "🌸 ท้องฟ้า Pink (ชมพู)", function() SetSky("Pink") end)
-    CreateButton(page, "🔄 รีเซ็ตท้องฟ้าเริ่มต้น", function() ResetSky() end)
-end)
-
--- ==========================================
 -- เมนู: เสกของ
 -- ==========================================
-CreateSidebarButton("🎁 เสกของ", 5, function()
-    local page = CreatePage("เสกของ (Spawn)")
+CreateSidebarButton("🎁 เสกของ", 2, function()
+    local page = CreatePage("เสกของ")
     local itemListFrame = Instance.new("ScrollingFrame")
     itemListFrame.Size = UDim2.new(1, 0, 0, 300)
     itemListFrame.BackgroundColor3 = Config.BgColor
     itemListFrame.BackgroundTransparency = 0.7
     itemListFrame.BorderSizePixel = 0
     itemListFrame.ScrollBarThickness = 3
-    itemListFrame.ScrollBarImageColor3 = Config.ThemeColor
     itemListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
     itemListFrame.ZIndex = 3
     itemListFrame.Parent = page
@@ -1525,7 +1406,7 @@ end)
 -- ==========================================
 -- เมนู: ขโมยไข่
 -- ==========================================
-CreateSidebarButton("🥚 ขโมยไข่", 6, function()
+CreateSidebarButton("🥚 ขโมยไข่", 3, function()
     local page = CreatePage("ขโมยไข่")
     local stealBtn = Instance.new("TextButton")
     stealBtn.Size = UDim2.new(1, 0, 0, 55)
@@ -1548,7 +1429,7 @@ end)
 -- ==========================================
 -- เมนู: ดึงเงิน
 -- ==========================================
-CreateSidebarButton("💰 ดึงเงิน", 7, function()
+CreateSidebarButton("💰 ดึงเงิน", 4, function()
     local page = CreatePage("ดึงเงิน")
     local playerListFrame = Instance.new("Frame")
     playerListFrame.Size = UDim2.new(1, 0, 0, 300)
@@ -1609,7 +1490,7 @@ end)
 -- ==========================================
 -- เมนู: ผู้เล่น
 -- ==========================================
-CreateSidebarButton("👥 ผู้เล่น", 8, function()
+CreateSidebarButton("👥 ผู้เล่น", 5, function()
     local page = CreatePage("รายชื่อผู้เล่น")
     local refreshBtn = Instance.new("TextButton")
     refreshBtn.Size = UDim2.new(1, 0, 0, 35)
@@ -1699,7 +1580,7 @@ end)
 -- ==========================================
 -- เมนู: ผู้เล่น/บิน
 -- ==========================================
-CreateSidebarButton("👤 ผู้เล่น/บิน", 9, function()
+CreateSidebarButton("👤 ผู้เล่น/บิน", 6, function()
     local page = CreatePage("ผู้เล่น & การเคลื่อนที่")
     CreateTextBox(page, "⚡ Speed (0-1000)", "SpeedValue", 500, 1000, function(value)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
@@ -1739,7 +1620,7 @@ end)
 -- ==========================================
 -- เมนู: เส้นมอง
 -- ==========================================
-CreateSidebarButton("👁️ เส้นมอง", 10, function()
+CreateSidebarButton("👁️ เส้นมอง", 7, function()
     local page = CreatePage("เส้นมอง (ESP)")
     CreateToggle(page, "เปิด/ปิด เส้นมอง", "ESP_Enabled", false, function(state) end)
     CreateToggle(page, "เปิด/ปิด กล่อง", "ESP_Box", false, function(state) end)
@@ -1781,10 +1662,85 @@ CreateSidebarButton("👁️ เส้นมอง", 10, function()
 end)
 
 -- ==========================================
--- เมนู: ตั้งค่า
+-- ✅ เมนู: ตั้งค่า (มี Graphics + RTX + Sky)
 -- ==========================================
-CreateSidebarButton("⚙️ ตั้งค่า", 11, function()
+CreateSidebarButton("⚙️ ตั้งค่า", 8, function()
     local page = CreatePage("ตั้งค่า")
+    
+    -- ============ ภาพสวย (Graphics) ============
+    local gfxLabel = Instance.new("TextLabel")
+    gfxLabel.Size = UDim2.new(1, 0, 0, 25)
+    gfxLabel.BackgroundTransparency = 1
+    gfxLabel.Text = "🎨 ภาพสวย (Graphics)"
+    gfxLabel.TextColor3 = Config.TextColor
+    gfxLabel.TextSize = 15
+    gfxLabel.Font = Enum.Font.GothamBold
+    gfxLabel.TextXAlignment = Enum.TextXAlignment.Left
+    gfxLabel.ZIndex = 3
+    gfxLabel.Parent = page
+    
+    CreateButton(page, "🎨 Cartoon (การ์ตูน)", function() EnableGraphics("Cartoon") end)
+    CreateButton(page, "📷 Realistic (สมจริง)", function() EnableGraphics("Realistic") end)
+    CreateButton(page, "🌸 Anime (อนิเมะ)", function() EnableGraphics("Anime") end)
+    CreateButton(page, "🌑 Dark (มืด)", function() EnableGraphics("Dark") end)
+    CreateButton(page, "💡 Neon (นีออน)", function() EnableGraphics("Neon") end)
+    CreateButton(page, "🔄 รีเซ็ตภาพ", function()
+        ClearGraphics()
+        pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
+        pcall(function()
+            Lighting.Brightness = 2
+            Lighting.GlobalShadows = true
+        end)
+        SendNotification("Graphics", "รีเซ็ตแล้ว", 2)
+    end)
+    
+    -- ============ RTX ============
+    local rtxLabel = Instance.new("TextLabel")
+    rtxLabel.Size = UDim2.new(1, 0, 0, 25)
+    rtxLabel.BackgroundTransparency = 1
+    rtxLabel.Text = "🎬 RTX (Real Ray Tracing)"
+    rtxLabel.TextColor3 = Config.TextColor
+    rtxLabel.TextSize = 15
+    rtxLabel.Font = Enum.Font.GothamBold
+    rtxLabel.TextXAlignment = Enum.TextXAlignment.Left
+    rtxLabel.ZIndex = 3
+    rtxLabel.Parent = page
+    
+    CreateButton(page, "🎬 เปิด RTX", function() EnableRTX() end)
+    CreateButton(page, "❌ ปิด RTX", function() DisableRTX() end)
+    
+    -- ============ ท้องฟ้า (Sky) ============
+    local skyLabel = Instance.new("TextLabel")
+    skyLabel.Size = UDim2.new(1, 0, 0, 25)
+    skyLabel.BackgroundTransparency = 1
+    skyLabel.Text = "🌌 ท้องฟ้า (Sky)"
+    skyLabel.TextColor3 = Config.TextColor
+    skyLabel.TextSize = 15
+    skyLabel.Font = Enum.Font.GothamBold
+    skyLabel.TextXAlignment = Enum.TextXAlignment.Left
+    skyLabel.ZIndex = 3
+    skyLabel.Parent = page
+    
+    CreateButton(page, "🌅 Sunset (พระอาทิตย์ตก)", function() SetSky("Sunset") end)
+    CreateButton(page, "🌌 Space (อวกาศ)", function() SetSky("Space") end)
+    CreateButton(page, "🌙 Night (กลางคืน)", function() SetSky("Night") end)
+    CreateButton(page, "☁️ Cloudy (เมฆ)", function() SetSky("Cloudy") end)
+    CreateButton(page, "☀️ Sunny (แดดจ้า)", function() SetSky("Sunny") end)
+    CreateButton(page, "🌸 Pink (ชมพู)", function() SetSky("Pink") end)
+    CreateButton(page, "🔄 รีเซ็ตท้องฟ้า", function() ResetSky() end)
+    
+    -- ============ อื่นๆ ============
+    local otherLabel = Instance.new("TextLabel")
+    otherLabel.Size = UDim2.new(1, 0, 0, 25)
+    otherLabel.BackgroundTransparency = 1
+    otherLabel.Text = "⚙️ ระบบอื่นๆ"
+    otherLabel.TextColor3 = Config.TextColor
+    otherLabel.TextSize = 15
+    otherLabel.Font = Enum.Font.GothamBold
+    otherLabel.TextXAlignment = Enum.TextXAlignment.Left
+    otherLabel.ZIndex = 3
+    otherLabel.Parent = page
+    
     CreateToggle(page, "⚡ แก้กระตุก", "AntiLagEnabled", false, function(state)
         if state then EnableAntiLag() else DisableAntiLag() end
     end)
@@ -1793,92 +1749,6 @@ CreateSidebarButton("⚙️ ตั้งค่า", 11, function()
     end)
     CreateToggle(page, "📊 FPS", "FPSEnabled", false, function(state) FPSLabel.Visible = state end)
     CreateToggle(page, "🌈 FPS RGB", "FPSRGB", false, function(state) end)
-    
-    CreateButton(page, "🔍 หาเซิร์ฟเวอร์ว่าง", function()
-        SendNotification("Server Finder", "กำลังค้นหา...", 2)
-        task.spawn(function()
-            local cursor = ""
-            local found = 0
-            local ServerFrame = Instance.new("Frame")
-            ServerFrame.Size = UDim2.new(0, 400, 0, 300)
-            ServerFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-            ServerFrame.BackgroundColor3 = Config.BgColor
-            ServerFrame.BackgroundTransparency = 0.1
-            ServerFrame.ZIndex = 50
-            ServerFrame.Parent = ScreenGui
-            Instance.new("UICorner", ServerFrame).CornerRadius = UDim.new(0, 12)
-            local sfTitle = Instance.new("TextLabel")
-            sfTitle.Size = UDim2.new(1, 0, 0, 40)
-            sfTitle.BackgroundTransparency = 1
-            sfTitle.Text = "Server Finder 💻"
-            sfTitle.TextColor3 = Config.TextColor
-            sfTitle.TextSize = 18
-            sfTitle.Font = Enum.Font.GothamBold
-            sfTitle.ZIndex = 51
-            sfTitle.Parent = ServerFrame
-            local sfClose = Instance.new("TextButton")
-            sfClose.Size = UDim2.new(0, 30, 0, 30)
-            sfClose.Position = UDim2.new(1, -35, 0, 5)
-            sfClose.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-            sfClose.Text = "X"
-            sfClose.TextColor3 = Color3.fromRGB(255, 255, 255)
-            sfClose.ZIndex = 51
-            sfClose.Parent = ServerFrame
-            Instance.new("UICorner", sfClose).CornerRadius = UDim.new(0, 6)
-            sfClose.MouseButton1Click:Connect(function() ServerFrame:Destroy() end)
-            local sfScroll = Instance.new("ScrollingFrame")
-            sfScroll.Size = UDim2.new(1, -20, 1, -50)
-            sfScroll.Position = UDim2.new(0, 10, 0, 45)
-            sfScroll.BackgroundTransparency = 1
-            sfScroll.ZIndex = 51
-            sfScroll.Parent = ServerFrame
-            local sfLayout = Instance.new("UIListLayout")
-            sfLayout.Padding = UDim.new(0, 5)
-            sfLayout.Parent = sfScroll
-            while found < 10 do
-                local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100&cursor=" .. cursor
-                local success, result = pcall(function() return game:HttpGet(url) end)
-                if success then
-                    local data = HttpService:JSONDecode(result)
-                    for _, server in pairs(data.data) do
-                        if server.playing < server.maxPlayers then
-                            found = found + 1
-                            local serverBtn = Instance.new("TextButton")
-                            serverBtn.Size = UDim2.new(1, -10, 0, 40)
-                            serverBtn.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-                            serverBtn.Text = "Server: " .. server.id:sub(1, 8) .. "... | " .. server.playing .. "/" .. server.maxPlayers
-                            serverBtn.TextColor3 = Config.TextColor
-                            serverBtn.TextSize = 12
-                            serverBtn.Font = Enum.Font.Gotham
-                            serverBtn.TextXAlignment = Enum.TextXAlignment.Left
-                            serverBtn.ZIndex = 52
-                            serverBtn.Parent = sfScroll
-                            Instance.new("UICorner", serverBtn).CornerRadius = UDim.new(0, 6)
-                            local joinBtn = Instance.new("TextButton")
-                            joinBtn.Size = UDim2.new(0, 60, 0, 25)
-                            joinBtn.Position = UDim2.new(1, -70, 0.5, -12.5)
-                            joinBtn.BackgroundColor3 = Color3.fromRGB(80, 120, 255)
-                            joinBtn.Text = "Join"
-                            joinBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                            joinBtn.Font = Enum.Font.GothamBold
-                            joinBtn.ZIndex = 53
-                            joinBtn.Parent = serverBtn
-                            Instance.new("UICorner", joinBtn).CornerRadius = UDim.new(0, 4)
-                            joinBtn.MouseButton1Click:Connect(function()
-                                pcall(function()
-                                    TeleportService:TeleportToPlaceInstance(game.PlaceId, server.id, LocalPlayer)
-                                end)
-                            end)
-                            if found >= 10 then break end
-                        end
-                    end
-                    cursor = data.nextPageCursor or ""
-                    if cursor == "" then break end
-                else break end
-                task.wait(0.5)
-            end
-        end)
-    end)
     
     CreateButton(page, "❌ ทำลาย UI", function()
         if FOVCircle then FOVCircle:Remove() end
@@ -2052,5 +1922,5 @@ task.spawn(function()
     if LoadingGui then LoadingGui:Destroy() end
     if ToggleButton then ToggleButton.Visible = true end
     if MainFrame then MainFrame.Visible = true end
-    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v41 พร้อมใช้!", 3)
+    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v42 พร้อมใช้!", 3)
 end)
