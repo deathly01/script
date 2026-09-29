@@ -1,6 +1,6 @@
 -- ==========================================
--- 🐱 แมวส้ม Script Hub - Complete Edition v38
--- (Spawn Manual + All Features - พร้อมใช้)
+-- 🐱 แมวส้ม Script Hub - Complete Edition v39
+-- (ESP Line + Spawn Pro + Steal Money)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -293,6 +293,76 @@ local function EnableAntiDrop()
 end
 local function DisableAntiDrop()
     if AntiDropConnection then AntiDropConnection:Disconnect(); AntiDropConnection = nil end
+end
+
+-- ==========================================
+-- ✅ ระบบดึงเงินจากผู้เล่น (Steal Money)
+-- ==========================================
+local MoneyStealing = false
+
+local function FindMoneyRemotes()
+    local remotes = {}
+    local keywords = {"money", "cash", "coin", "steal", "rob", "take", "grab", "claim", "transfer"}
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local name = string.lower(obj.Name)
+            for _, kw in ipairs(keywords) do
+                if string.find(name, kw) then
+                    table.insert(remotes, obj)
+                    break
+                end
+            end
+        end
+    end
+    return remotes
+end
+
+local function StealMoneyFromPlayer(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then
+        SendNotification("ดึงเงิน", "ไม่พบเป้าหมาย", 2)
+        return
+    end
+    
+    local targetChar = targetPlayer.Character
+    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+    if not targetHRP then
+        SendNotification("ดึงเงิน", "ไม่พบตำแหน่งเป้าหมาย", 2)
+        return
+    end
+    
+    local remotes = FindMoneyRemotes()
+    if #remotes == 0 then
+        SendNotification("ดึงเงิน", "❌ ไม่พบ Remote เกี่ยวกับเงิน", 3)
+        return
+    end
+    
+    local targetName = targetPlayer.Name
+    SendNotification("ดึงเงิน", "กำลังดึงจาก: " .. targetName, 2)
+    
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    
+    -- ยิง Remote ทุกตัวที่เจอ
+    for _, remote in ipairs(remotes) do
+        pcall(function()
+            -- ลองส่งแบบต่างๆ
+            remote:FireServer(targetPlayer)
+            remote:FireServer(targetChar)
+            remote:FireServer(targetPlayer.UserId)
+            remote:FireServer(targetName)
+            remote:FireServer(targetHRP.Position)
+            remote:FireServer(targetHRP.CFrame)
+            if myHRP then
+                remote:FireServer(myHRP.CFrame, targetHRP.CFrame)
+                remote:FireServer(myHRP.Position, targetHRP.Position)
+            end
+            remote:FireServer(targetPlayer, 1)
+            remote:FireServer(targetPlayer, 999999)
+            remote:FireServer(targetPlayer.UserId, 999999)
+        end)
+    end
+    
+    SendNotification("ดึงเงิน", "✅ ยิง Remote " .. #remotes .. " ตัวใส่ " .. targetName, 3)
 end
 
 -- ==========================================
@@ -831,7 +901,7 @@ end
 Players.PlayerRemoving:Connect(RemoveESP)
 
 -- ==========================================
--- Anti-Lag / AFK
+-- Anti-Lag / AFK / Graphics
 -- ==========================================
 local AntiLagConnection = nil
 local AFKConnection = nil
@@ -883,142 +953,6 @@ local function DisableAFK()
 end
 
 -- ==========================================
--- ภาพสวย 4K / ท้องฟ้า 4K / RTX
--- ==========================================
-local Graphics4KEffects = {}
-local function EnableGraphics4K()
-    pcall(function()
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level10
-        settings().Rendering.MeshPartDetailLevel = Enum.MeshPartDetailLevel.Level04
-        settings().Rendering.EditQualityLevel = 21
-    end)
-    pcall(function()
-        local cc = Instance.new("ColorCorrectionEffect")
-        cc.Name = "4K_CC"
-        cc.Brightness = 0.05
-        cc.Contrast = 0.25
-        cc.Saturation = 0.4
-        cc.TintColor = Color3.fromRGB(255, 250, 245)
-        cc.Parent = Lighting
-        table.insert(Graphics4KEffects, cc)
-        local bloom = Instance.new("BloomEffect")
-        bloom.Name = "4K_Bloom"
-        bloom.Intensity = 1.8
-        bloom.Size = 30
-        bloom.Threshold = 0.8
-        bloom.Parent = Lighting
-        table.insert(Graphics4KEffects, bloom)
-        Lighting.GlobalShadows = true
-        Lighting.FogEnd = 9e9
-        Lighting.Brightness = 2.8
-    end)
-    SendNotification("4K Graphics", "เปิดแล้ว!", 3)
-end
-local function DisableGraphics4K()
-    for _, effect in pairs(Graphics4KEffects) do
-        pcall(function() effect:Destroy() end)
-    end
-    Graphics4KEffects = {}
-    SendNotification("4K Graphics", "ปิด", 2)
-end
-
-local Sky4KEffects = {}
-local function EnableSky4K()
-    pcall(function()
-        for _, v in pairs(Lighting:GetChildren()) do
-            if v:IsA("Sky") then v:Destroy() end
-        end
-        local sky = Instance.new("Sky")
-        sky.Name = "4K_Sky"
-        sky.SkyboxBk = "rbxassetid://159454299"
-        sky.SkyboxDn = "rbxassetid://159454296"
-        sky.SkyboxFt = "rbxassetid://159454293"
-        sky.SkyboxLf = "rbxassetid://159454286"
-        sky.SkyboxRt = "rbxassetid://159454300"
-        sky.SkyboxUp = "rbxassetid://159454288"
-        sky.StarCount = 3000
-        sky.Parent = Lighting
-        table.insert(Sky4KEffects, sky)
-    end)
-    SendNotification("4K Sky", "เปิดแล้ว!", 3)
-end
-local function DisableSky4K()
-    for _, effect in pairs(Sky4KEffects) do
-        pcall(function() effect:Destroy() end)
-    end
-    Sky4KEffects = {}
-    SendNotification("4K Sky", "ปิด", 2)
-end
-
-local RTXEffects = {}
-local function EnableRTX()
-    pcall(function()
-        settings().Rendering.QualityLevel = Enum.QualityLevel.Level10
-        local cc = Instance.new("ColorCorrectionEffect")
-        cc.Name = "RTX_CC"
-        cc.Brightness = 0.03
-        cc.Contrast = 0.35
-        cc.Saturation = 0.45
-        cc.TintColor = Color3.fromRGB(240, 245, 255)
-        cc.Parent = Lighting
-        table.insert(RTXEffects, cc)
-        local bloom = Instance.new("BloomEffect")
-        bloom.Name = "RTX_Bloom"
-        bloom.Intensity = 2.5
-        bloom.Size = 40
-        bloom.Threshold = 0.7
-        bloom.Parent = Lighting
-        table.insert(RTXEffects, bloom)
-        local sunRays = Instance.new("SunRaysEffect")
-        sunRays.Name = "RTX_SunRays"
-        sunRays.Intensity = 0.3
-        sunRays.Spread = 1.2
-        sunRays.Parent = Lighting
-        table.insert(RTXEffects, sunRays)
-        local dof = Instance.new("DepthOfFieldEffect")
-        dof.Name = "RTX_DOF"
-        dof.FarIntensity = 0.15
-        dof.FocusDistance = 25
-        dof.InFocusRadius = 35
-        dof.NearIntensity = 0.1
-        dof.Parent = Lighting
-        table.insert(RTXEffects, dof)
-        local blur = Instance.new("BlurEffect")
-        blur.Name = "RTX_Blur"
-        blur.Size = 2
-        blur.Parent = Lighting
-        table.insert(RTXEffects, blur)
-        local atmosphere = Lighting:FindFirstChildOfClass("Atmosphere")
-        if not atmosphere then
-            atmosphere = Instance.new("Atmosphere")
-            atmosphere.Parent = Lighting
-        end
-        atmosphere.Name = "RTX_Atmosphere"
-        atmosphere.Density = 0.4
-        atmosphere.Offset = 0.3
-        atmosphere.Glare = 1
-        atmosphere.Haze = 2.5
-        table.insert(RTXEffects, atmosphere)
-        Lighting.GlobalShadows = true
-        Lighting.FogEnd = 9e9
-        Lighting.Brightness = 3
-        Lighting.Ambient = Color3.fromRGB(90, 90, 100)
-        Lighting.OutdoorAmbient = Color3.fromRGB(150, 150, 160)
-        Lighting.EnvironmentDiffuseScale = 1
-        Lighting.EnvironmentSpecularScale = 1
-        Lighting.ShadowSoftness = 0.6
-    end)
-    SendNotification("RTX Graphics", "เปิดแล้ว!", 3)
-end
-local function DisableRTX()
-    for _, effect in pairs(RTXEffects) do
-        pcall(function() effect:Destroy() end)
-    end
-    RTXEffects = {}
-    SendNotification("RTX Graphics", "ปิด", 2)
-end
-
--- ==========================================
 -- Silent Aim Hooks
 -- ==========================================
 if hasHook and hasGetNamecall then
@@ -1064,7 +998,6 @@ CreateSidebarButton("🏠 หน้าหลัก", 1, function()
     aimModeBtn.TextSize = 14
     aimModeBtn.Font = Enum.Font.GothamBold
     aimModeBtn.ZIndex = 6
-    aimModeBtn.Active = true
     aimModeBtn.Parent = page
     Instance.new("UICorner", aimModeBtn).CornerRadius = UDim.new(0, 8)
     aimModeBtn.MouseButton1Click:Connect(function()
@@ -1083,9 +1016,107 @@ CreateSidebarButton("🏠 หน้าหลัก", 1, function()
 end)
 
 -- ==========================================
--- ✅ เมนู: เสกของ (Manual)
+-- ✅ เมนู: ดึงเงินจากผู้เล่น (ใหม่)
 -- ==========================================
-CreateSidebarButton("🎁 เสกของ", 2, function()
+CreateSidebarButton("💰 ดึงเงิน", 2, function()
+    local page = CreatePage("ดึงเงินจากผู้เล่น")
+    
+    local info = Instance.new("TextLabel")
+    info.Size = UDim2.new(1, 0, 0, 60)
+    info.BackgroundTransparency = 1
+    info.Text = "ระบบดึงเงินจากผู้เล่น\nใช้ Remote ที่เกี่ยวกับเงินในการดึง\n(อาจไม่ทำงานกับทุกเกม)"
+    info.TextColor3 = Config.TextDim
+    info.TextSize = 12
+    info.Font = Enum.Font.Gotham
+    info.TextWrapped = true
+    info.ZIndex = 3
+    info.Parent = page
+    
+    local playerListFrame = Instance.new("Frame")
+    playerListFrame.Size = UDim2.new(1, 0, 0, 300)
+    playerListFrame.BackgroundColor3 = Config.BgColor
+    playerListFrame.BackgroundTransparency = 0.7
+    playerListFrame.ZIndex = 3
+    playerListFrame.Parent = page
+    Instance.new("UICorner", playerListFrame).CornerRadius = UDim.new(0, 8)
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 5)
+    listLayout.Parent = playerListFrame
+    
+    local function RefreshPlayerList()
+        for _, v in pairs(playerListFrame:GetChildren()) do
+            if v:IsA("Frame") then v:Destroy() end
+        end
+        for _, player in pairs(Players:GetPlayers()) do
+            if player ~= LocalPlayer then
+                local row = Instance.new("Frame")
+                row.Size = UDim2.new(1, -10, 0, 45)
+                row.Position = UDim2.new(0, 5, 0, 0)
+                row.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+                row.ZIndex = 4
+                row.Parent = playerListFrame
+                Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
+                
+                local nameLabel = Instance.new("TextLabel")
+                nameLabel.Size = UDim2.new(0.55, 0, 1, 0)
+                nameLabel.Position = UDim2.new(0, 5, 0, 0)
+                nameLabel.BackgroundTransparency = 1
+                nameLabel.Text = player.Name
+                nameLabel.TextColor3 = Config.TextColor
+                nameLabel.TextSize = 13
+                nameLabel.Font = Enum.Font.Gotham
+                nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+                nameLabel.ZIndex = 5
+                nameLabel.Parent = row
+                
+                local stealBtn = Instance.new("TextButton")
+                stealBtn.Size = UDim2.new(0, 80, 0, 32)
+                stealBtn.Position = UDim2.new(1, -90, 0.5, -16)
+                stealBtn.BackgroundColor3 = Color3.fromRGB(255, 150, 0)
+                stealBtn.Text = "💰 ดึงเงิน"
+                stealBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                stealBtn.TextSize = 12
+                stealBtn.Font = Enum.Font.GothamBold
+                stealBtn.ZIndex = 5
+                stealBtn.Parent = row
+                Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 6)
+                
+                stealBtn.MouseButton1Click:Connect(function()
+                    StealMoneyFromPlayer(player)
+                end)
+            end
+        end
+    end
+    
+    CreateButton(page, "🔄 รีเฟรชรายชื่อ", function()
+        RefreshPlayerList()
+        SendNotification("ดึงเงิน", "รีเฟรชรายชื่อแล้ว", 2)
+    end)
+    
+    CreateButton(page, "🔍 สแกน Remote เกี่ยวกับเงิน", function()
+        local remotes = FindMoneyRemotes()
+        if #remotes == 0 then
+            SendNotification("สแกน", "❌ ไม่พบ Remote เกี่ยวกับเงิน", 3)
+        else
+            local names = ""
+            for i, r in ipairs(remotes) do
+                names = names .. r.Name .. "\n"
+            end
+            SendNotification("สแกน", "พบ " .. #remotes .. " Remote:\n" .. names, 5)
+        end
+    end)
+    
+    Players.PlayerAdded:Connect(function() task.wait(0.5); RefreshPlayerList() end)
+    Players.PlayerRemoving:Connect(function() task.wait(0.5); RefreshPlayerList() end)
+    task.wait(0.1)
+    RefreshPlayerList()
+end)
+
+-- ==========================================
+-- ✅ เมนู: เสกของ (Pro)
+-- ==========================================
+CreateSidebarButton("🎁 เสกของ", 3, function()
     local page = CreatePage("เสกของ (Spawn Item)")
     
     local info = Instance.new("TextLabel")
@@ -1099,23 +1130,11 @@ CreateSidebarButton("🎁 เสกของ", 2, function()
     info.ZIndex = 3
     info.Parent = page
     
-    -- ช่องใส่ชื่อ Remote
-    local remoteLabel = Instance.new("TextLabel")
-    remoteLabel.Size = UDim2.new(1, 0, 0, 20)
-    remoteLabel.BackgroundTransparency = 1
-    remoteLabel.Text = "📡 ชื่อ Remote"
-    remoteLabel.TextColor3 = Config.TextDim
-    remoteLabel.TextSize = 12
-    remoteLabel.Font = Enum.Font.Gotham
-    remoteLabel.TextXAlignment = Enum.TextXAlignment.Left
-    remoteLabel.ZIndex = 3
-    remoteLabel.Parent = page
-    
     local remoteBox = Instance.new("TextBox")
     remoteBox.Size = UDim2.new(1, 0, 0, 35)
     remoteBox.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     remoteBox.Text = ""
-    remoteBox.PlaceholderText = "ชื่อ Remote ที่ Remote Spy แสดง"
+    remoteBox.PlaceholderText = "📡 ชื่อ Remote"
     remoteBox.TextColor3 = Config.TextColor
     remoteBox.Font = Enum.Font.Gotham
     remoteBox.TextSize = 13
@@ -1123,23 +1142,11 @@ CreateSidebarButton("🎁 เสกของ", 2, function()
     remoteBox.Parent = page
     Instance.new("UICorner", remoteBox).CornerRadius = UDim.new(0, 6)
     
-    -- ช่องใส่ Argument
-    local argLabel = Instance.new("TextLabel")
-    argLabel.Size = UDim2.new(1, 0, 0, 20)
-    argLabel.BackgroundTransparency = 1
-    argLabel.Text = "📦 Argument (คั่นด้วย , )"
-    argLabel.TextColor3 = Config.TextDim
-    argLabel.TextSize = 12
-    argLabel.Font = Enum.Font.Gotham
-    argLabel.TextXAlignment = Enum.TextXAlignment.Left
-    argLabel.ZIndex = 3
-    argLabel.Parent = page
-    
     local argBox = Instance.new("TextBox")
     argBox.Size = UDim2.new(1, 0, 0, 35)
     argBox.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
     argBox.Text = ""
-    argBox.PlaceholderText = "เช่น Dragon, 1, true"
+    argBox.PlaceholderText = "📦 Argument (คั่นด้วย , )"
     argBox.TextColor3 = Config.TextColor
     argBox.Font = Enum.Font.Gotham
     argBox.TextSize = 13
@@ -1147,7 +1154,6 @@ CreateSidebarButton("🎁 เสกของ", 2, function()
     argBox.Parent = page
     Instance.new("UICorner", argBox).CornerRadius = UDim.new(0, 6)
     
-    -- ปุ่มเสก
     local spawnBtn = Instance.new("TextButton")
     spawnBtn.Size = UDim2.new(1, 0, 0, 50)
     spawnBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
@@ -1156,7 +1162,6 @@ CreateSidebarButton("🎁 เสกของ", 2, function()
     spawnBtn.TextSize = 16
     spawnBtn.Font = Enum.Font.GothamBold
     spawnBtn.ZIndex = 6
-    spawnBtn.Active = true
     spawnBtn.Parent = page
     Instance.new("UICorner", spawnBtn).CornerRadius = UDim.new(0, 10)
     
@@ -1169,24 +1174,20 @@ CreateSidebarButton("🎁 เสกของ", 2, function()
             return
         end
         
-        -- ค้นหา Remote
-        local remote = nil
-        for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-            if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and obj.Name == remoteName then
-                remote = obj
-                break
-            end
-        end
-        if not remote then
-            for _, obj in pairs(Workspace:GetDescendants()) do
-                if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and obj.Name == remoteName then
-                    remote = obj
-                    break
+        -- ค้นหา Remote ทุกที่
+        local foundRemotes = {}
+        local sources = {ReplicatedStorage, Workspace, game:GetService("ServerStorage"), LocalPlayer:FindFirstChildOfClass("PlayerGui")}
+        for _, source in pairs(sources) do
+            if source then
+                for _, obj in pairs(source:GetDescendants()) do
+                    if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and obj.Name == remoteName then
+                        table.insert(foundRemotes, obj)
+                    end
                 end
             end
         end
         
-        if not remote then
+        if #foundRemotes == 0 then
             SendNotification("เสกของ", "❌ ไม่พบ Remote: " .. remoteName, 3)
             return
         end
@@ -1209,80 +1210,96 @@ CreateSidebarButton("🎁 เสกของ", 2, function()
             end
         end
         
-        pcall(function()
-            if #args > 0 then
-                remote:FireServer(unpack(args))
-            else
-                remote:FireServer()
-            end
-            SendNotification("เสกของ", "✅ ยิง: " .. remoteName, 2)
-        end)
+        -- ยิงทุก Remote ที่เจอ
+        for _, remote in ipairs(foundRemotes) do
+            pcall(function()
+                if #args > 0 then
+                    remote:FireServer(unpack(args))
+                    remote:InvokeServer(unpack(args))
+                else
+                    remote:FireServer()
+                    remote:InvokeServer()
+                end
+            end)
+        end
+        
+        SendNotification("เสกของ", "✅ ยิง " .. #foundRemotes .. " Remote", 2)
     end)
     
-    -- ปุ่มสแกน Remote
-    local scanBtn = Instance.new("TextButton")
-    scanBtn.Size = UDim2.new(1, 0, 0, 40)
-    scanBtn.BackgroundColor3 = Color3.fromRGB(80, 120, 255)
-    scanBtn.Text = "🔍 สแกน Remote ทั้งหมด"
-    scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    scanBtn.TextSize = 14
-    scanBtn.Font = Enum.Font.GothamBold
-    scanBtn.ZIndex = 6
-    scanBtn.Active = true
-    scanBtn.Parent = page
-    Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 10)
-    
-    local remoteListFrame = Instance.new("Frame")
-    remoteListFrame.Size = UDim2.new(1, 0, 0, 200)
-    remoteListFrame.BackgroundColor3 = Config.BgColor
-    remoteListFrame.BackgroundTransparency = 0.7
-    remoteListFrame.ZIndex = 3
-    remoteListFrame.Parent = page
-    Instance.new("UICorner", remoteListFrame).CornerRadius = UDim.new(0, 8)
-    local listLayout = Instance.new("UIListLayout")
-    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
-    listLayout.Padding = UDim.new(0, 3)
-    listLayout.Parent = remoteListFrame
-    
-    scanBtn.MouseButton1Click:Connect(function()
-        SendNotification("สแกน", "กำลังสแกน Remote...", 2)
-        for _, v in pairs(remoteListFrame:GetChildren()) do
-            if v:IsA("TextButton") then v:Destroy() end
-        end
+    -- ปุ่มสแกน
+    CreateButton(page, "🔍 สแกน Remote ทั้งหมด", function()
+        SendNotification("สแกน", "กำลังสแกน...", 2)
+        local scanFrame = Instance.new("Frame")
+        scanFrame.Size = UDim2.new(0, 400, 0, 300)
+        scanFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+        scanFrame.BackgroundColor3 = Config.BgColor
+        scanFrame.BackgroundTransparency = 0.1
+        scanFrame.ZIndex = 50
+        scanFrame.Parent = ScreenGui
+        Instance.new("UICorner", scanFrame).CornerRadius = UDim.new(0, 12)
+        
+        local sfTitle = Instance.new("TextLabel")
+        sfTitle.Size = UDim2.new(1, 0, 0, 40)
+        sfTitle.BackgroundTransparency = 1
+        sfTitle.Text = "Remote Scanner 🔍"
+        sfTitle.TextColor3 = Config.TextColor
+        sfTitle.TextSize = 18
+        sfTitle.Font = Enum.Font.GothamBold
+        sfTitle.ZIndex = 51
+        sfTitle.Parent = scanFrame
+        
+        local sfClose = Instance.new("TextButton")
+        sfClose.Size = UDim2.new(0, 30, 0, 30)
+        sfClose.Position = UDim2.new(1, -35, 0, 5)
+        sfClose.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+        sfClose.Text = "X"
+        sfClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+        sfClose.ZIndex = 51
+        sfClose.Parent = scanFrame
+        Instance.new("UICorner", sfClose).CornerRadius = UDim.new(0, 6)
+        sfClose.MouseButton1Click:Connect(function() scanFrame:Destroy() end)
+        
+        local sfScroll = Instance.new("ScrollingFrame")
+        sfScroll.Size = UDim2.new(1, -20, 1, -50)
+        sfScroll.Position = UDim2.new(0, 10, 0, 45)
+        sfScroll.BackgroundTransparency = 1
+        sfScroll.ZIndex = 51
+        sfScroll.Parent = scanFrame
+        local sfLayout = Instance.new("UIListLayout")
+        sfLayout.Padding = UDim.new(0, 3)
+        sfLayout.Parent = sfScroll
+        
         local count = 0
-        local sources = {ReplicatedStorage, Workspace}
-        for _, source in pairs(sources) do
-            for _, obj in pairs(source:GetDescendants()) do
-                if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                    count = count + 1
-                    if count <= 50 then
-                        local btn = Instance.new("TextButton")
-                        btn.Size = UDim2.new(1, -10, 0, 30)
-                        btn.BackgroundColor3 = Color3.fromRGB(60, 50, 90)
-                        btn.Text = "📡 " .. obj.Name
-                        btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                        btn.TextSize = 12
-                        btn.Font = Enum.Font.Gotham
-                        btn.TextXAlignment = Enum.TextXAlignment.Left
-                        btn.ZIndex = 5
-                        btn.Parent = remoteListFrame
-                        Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-                        btn.MouseButton1Click:Connect(function()
-                            remoteBox.Text = obj.Name
-                            SendNotification("เลือกแล้ว", obj.Name, 2)
-                        end)
-                    end
+        for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+                count = count + 1
+                if count <= 100 then
+                    local btn = Instance.new("TextButton")
+                    btn.Size = UDim2.new(1, -10, 0, 30)
+                    btn.BackgroundColor3 = Color3.fromRGB(60, 50, 90)
+                    btn.Text = "📡 " .. obj.Name
+                    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                    btn.TextSize = 12
+                    btn.Font = Enum.Font.Gotham
+                    btn.TextXAlignment = Enum.TextXAlignment.Left
+                    btn.ZIndex = 52
+                    btn.Parent = sfScroll
+                    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
+                    btn.MouseButton1Click:Connect(function()
+                        remoteBox.Text = obj.Name
+                        SendNotification("เลือก", obj.Name, 2)
+                    end)
                 end
             end
         end
-        SendNotification("สแกน", "พบ Remote " .. count .. " ตัว", 3)
+        SendNotification("สแกน", "พบ " .. count .. " Remote", 3)
     end)
 end)
 
 -- ==========================================
 -- เมนู: ขโมยไข่
 -- ==========================================
-CreateSidebarButton("🥚 ขโมยไข่", 3, function()
+CreateSidebarButton("🥚 ขโมยไข่", 4, function()
     local page = CreatePage("ขโมยไข่")
     local info = Instance.new("TextLabel")
     info.Size = UDim2.new(1, 0, 0, 50)
@@ -1303,7 +1320,6 @@ CreateSidebarButton("🥚 ขโมยไข่", 3, function()
     stealBtn.TextSize = 16
     stealBtn.Font = Enum.Font.GothamBold
     stealBtn.ZIndex = 6
-    stealBtn.Active = true
     stealBtn.Parent = page
     Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 10)
     stealBtn.MouseButton1Click:Connect(function() StealEggOnce() end)
@@ -1318,7 +1334,7 @@ end)
 -- ==========================================
 -- เมนู: ผู้เล่น
 -- ==========================================
-CreateSidebarButton("👥 ผู้เล่น", 4, function()
+CreateSidebarButton("👥 ผู้เล่น", 5, function()
     local page = CreatePage("รายชื่อผู้เล่น")
     local refreshBtn = Instance.new("TextButton")
     refreshBtn.Size = UDim2.new(1, 0, 0, 35)
@@ -1410,14 +1426,14 @@ end)
 -- ==========================================
 -- เมนู: ผู้เล่น/บิน
 -- ==========================================
-CreateSidebarButton("👤 ผู้เล่น/บิน", 5, function()
+CreateSidebarButton("👤 ผู้เล่น/บิน", 6, function()
     local page = CreatePage("ผู้เล่น & การเคลื่อนที่")
     CreateTextBox(page, "⚡ Speed (0-1000)", "SpeedValue", 500, 1000, function(value)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
             LocalPlayer.Character.Humanoid.WalkSpeed = value
         end
     end)
-    CreateToggle(page, "🏃 วิ่งเร็ว ×1000", "SpeedEnabled", false, function(state)
+    CreateToggle(page, "🏃 วิ่งเร็ว", "SpeedEnabled", false, function(state)
         if LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("Humanoid") then
             LocalPlayer.Character.Humanoid.WalkSpeed = state and Config.SpeedValue or 16
         end
@@ -1449,18 +1465,40 @@ CreateSidebarButton("👤 ผู้เล่น/บิน", 5, function()
 end)
 
 -- ==========================================
--- เมนู: เส้นมอง
+-- ✅ เมนู: เส้นมอง (กลับมาแล้ว!)
 -- ==========================================
-CreateSidebarButton("👁️ เส้นมอง", 6, function()
+CreateSidebarButton("👁️ เส้นมอง", 7, function()
     local page = CreatePage("เส้นมอง (ESP)")
-    CreateToggle(page, "เปิด/ปิด เส้นมอง", "ESP_Enabled", false, function(state) end)
-    CreateToggle(page, "เปิด/ปิด กล่อง", "ESP_Box", false, function(state) end)
-    CreateToggle(page, "เปิด/ปิด หลอดเลือด", "ESP_Health", false, function(state) end)
+    CreateToggle(page, "เปิด/ปิด เส้นมอง (Tracer)", "ESP_Enabled", false, function(state) end)
+    CreateToggle(page, "เปิด/ปิด กล่องรอบตัว (Box)", "ESP_Box", false, function(state) end)
+    CreateToggle(page, "เปิด/ปิด หลอดเลือด (Health)", "ESP_Health", false, function(state) end)
+    
+    -- ✅ ปุ่มเปลี่ยนตำแหน่งเส้น Top/Bottom
+    local modeBtn = Instance.new("TextButton")
+    modeBtn.Size = UDim2.new(1, 0, 0, 35)
+    modeBtn.BackgroundColor3 = Config.BgColor
+    modeBtn.BackgroundTransparency = 0.5
+    modeBtn.Text = "📍 ตำแหน่งเส้น: " .. (Config.ESP_LineMode == "Top" and "ด้านบน" or "ด้านล่าง")
+    modeBtn.TextColor3 = Config.TextColor
+    modeBtn.TextSize = 14
+    modeBtn.Font = Enum.Font.Gotham
+    modeBtn.ZIndex = 6
+    modeBtn.Active = true
+    modeBtn.Parent = page
+    Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 8)
+    modeBtn.MouseButton1Click:Connect(function()
+        Config.ESP_LineMode = (Config.ESP_LineMode == "Top") and "Bottom" or "Top"
+        modeBtn.Text = "📍 ตำแหน่งเส้น: " .. (Config.ESP_LineMode == "Top" and "ด้านบน" or "ด้านล่าง")
+        SendNotification("ESP", "เปลี่ยนเป็น: " .. (Config.ESP_LineMode == "Top" and "ด้านบน" or "ด้านล่าง"), 2)
+    end)
+    
+    -- ✅ ปุ่มเปลี่ยนสีเส้น
     local colorBtn = Instance.new("TextButton")
     colorBtn.Size = UDim2.new(1, 0, 0, 35)
     colorBtn.BackgroundColor3 = Config.ESP_LineColor
     colorBtn.Text = "🎨 เปลี่ยนสีเส้น ESP"
     colorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    colorBtn.TextSize = 14
     colorBtn.Font = Enum.Font.Gotham
     colorBtn.ZIndex = 6
     colorBtn.Parent = page
@@ -1475,18 +1513,66 @@ CreateSidebarButton("👁️ เส้นมอง", 6, function()
         Config.ESP_LineColor = newColor
         colorBtn.BackgroundColor3 = newColor
         if FOVCircle then FOVCircle.Color = newColor end
+        SendNotification("ESP", "เปลี่ยนสีเส้นแล้ว", 2)
+    end)
+    
+    -- Slider ปรับความหนาเส้น
+    local thicknessLabel = Instance.new("TextLabel")
+    thicknessLabel.Size = UDim2.new(1, 0, 0, 20)
+    thicknessLabel.BackgroundTransparency = 1
+    thicknessLabel.Text = "ความหนาเส้น: 1.5"
+    thicknessLabel.TextColor3 = Config.TextDim
+    thicknessLabel.TextSize = 13
+    thicknessLabel.Font = Enum.Font.Gotham
+    thicknessLabel.TextXAlignment = Enum.TextXAlignment.Left
+    thicknessLabel.ZIndex = 3
+    thicknessLabel.Parent = page
+    
+    local thicknessSlider = Instance.new("Frame")
+    thicknessSlider.Size = UDim2.new(1, 0, 0, 15)
+    thicknessSlider.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+    thicknessSlider.ZIndex = 3
+    thicknessSlider.Parent = page
+    Instance.new("UICorner", thicknessSlider).CornerRadius = UDim.new(1, 0)
+    local thicknessFill = Instance.new("Frame")
+    thicknessFill.Size = UDim2.new(0.3, 0, 1, 0)
+    thicknessFill.BackgroundColor3 = Config.ThemeColor
+    thicknessFill.ZIndex = 4
+    thicknessFill.Parent = thicknessSlider
+    Instance.new("UICorner", thicknessFill).CornerRadius = UDim.new(1, 0)
+    local thicknessBtn = Instance.new("TextButton")
+    thicknessBtn.Size = UDim2.new(1, 0, 1, 0)
+    thicknessBtn.BackgroundTransparency = 1
+    thicknessBtn.Text = ""
+    thicknessBtn.ZIndex = 5
+    thicknessBtn.Parent = thicknessSlider
+    local tDragging = false
+    local function updateThickness()
+        local mouse = UserInputService:GetMouseLocation()
+        local percent = math.clamp((mouse.X - thicknessSlider.AbsolutePosition.X) / thicknessSlider.AbsoluteSize.X, 0, 1)
+        local value = 1 + (percent * 4) -- 1 to 5
+        thicknessFill.Size = UDim2.new(percent, 0, 1, 0)
+        thicknessLabel.Text = "ความหนาเส้น: " .. string.format("%.1f", value)
+        Config.LineThickness = value
+    end
+    thicknessBtn.MouseButton1Down:Connect(function() tDragging = true; updateThickness() end)
+    UserInputService.InputChanged:Connect(function(input)
+        if tDragging and input.UserInputType == Enum.UserInputType.MouseMovement then updateThickness() end
+    end)
+    UserInputService.InputEnded:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then tDragging = false end
     end)
 end)
 
 -- ==========================================
 -- เมนู: ตั้งค่า
 -- ==========================================
-CreateSidebarButton("⚙️ ตั้งค่า", 7, function()
+CreateSidebarButton("⚙️ ตั้งค่า", 8, function()
     local page = CreatePage("ตั้งค่า")
     local infoLabel = Instance.new("TextLabel")
     infoLabel.Size = UDim2.new(1, 0, 0, 60)
     infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "🐱 แมวส้ม Script Hub v38\nHook: " .. (hasHook and "✅ รองรับ" or "❌ ไม่รองรับ")
+    infoLabel.Text = "🐱 แมวส้ม Script Hub v39\nHook: " .. (hasHook and "✅ รองรับ" or "❌ ไม่รองรับ")
     infoLabel.TextColor3 = Config.TextDim
     infoLabel.TextSize = 12
     infoLabel.Font = Enum.Font.Gotham
@@ -1495,14 +1581,55 @@ CreateSidebarButton("⚙️ ตั้งค่า", 7, function()
     infoLabel.ZIndex = 3
     infoLabel.Parent = page
     
+    -- 4K / RTX
     CreateToggle(page, "🎨 ภาพสวย 4K", "Graphics4KEnabled", false, function(state)
-        if state then EnableGraphics4K() else DisableGraphics4K() end
+        if state then
+            pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level10 end)
+            pcall(function()
+                local cc = Instance.new("ColorCorrectionEffect")
+                cc.Brightness = 0.05; cc.Contrast = 0.25; cc.Saturation = 0.4
+                cc.Parent = Lighting
+                local bloom = Instance.new("BloomEffect")
+                bloom.Intensity = 1.8; bloom.Size = 30
+                bloom.Parent = Lighting
+            end)
+            SendNotification("4K", "เปิดแล้ว!", 2)
+        end
     end)
-    CreateToggle(page, "🌌 ท้องฟ้าสวย 4K", "Sky4KEnabled", false, function(state)
-        if state then EnableSky4K() else DisableSky4K() end
+    CreateToggle(page, "🌌 ท้องฟ้า 4K", "Sky4KEnabled", false, function(state)
+        if state then
+            pcall(function()
+                for _, v in pairs(Lighting:GetChildren()) do
+                    if v:IsA("Sky") then v:Destroy() end
+                end
+                local sky = Instance.new("Sky")
+                sky.SkyboxBk = "rbxassetid://159454299"
+                sky.SkyboxDn = "rbxassetid://159454296"
+                sky.SkyboxFt = "rbxassetid://159454293"
+                sky.SkyboxLf = "rbxassetid://159454286"
+                sky.SkyboxRt = "rbxassetid://159454300"
+                sky.SkyboxUp = "rbxassetid://159454288"
+                sky.StarCount = 3000
+                sky.Parent = Lighting
+            end)
+            SendNotification("Sky 4K", "เปิดแล้ว!", 2)
+        end
     end)
     CreateToggle(page, "🎬 ภาพ RTX", "RTXEnabled", false, function(state)
-        if state then EnableRTX() else DisableRTX() end
+        if state then
+            pcall(function()
+                local cc = Instance.new("ColorCorrectionEffect")
+                cc.Brightness = 0.03; cc.Contrast = 0.35; cc.Saturation = 0.45
+                cc.Parent = Lighting
+                local bloom = Instance.new("BloomEffect")
+                bloom.Intensity = 2.5; bloom.Size = 40
+                bloom.Parent = Lighting
+                local sunRays = Instance.new("SunRaysEffect")
+                sunRays.Intensity = 0.3
+                sunRays.Parent = Lighting
+            end)
+            SendNotification("RTX", "เปิดแล้ว!", 2)
+        end
     end)
     CreateToggle(page, "⚡ แก้กระตุก", "AntiLagEnabled", false, function(state)
         if state then EnableAntiLag() else DisableAntiLag() end
@@ -1515,45 +1642,45 @@ CreateSidebarButton("⚙️ ตั้งค่า", 7, function()
     
     CreateButton(page, "🔍 หาเซิร์ฟเวอร์ว่าง", function()
         SendNotification("Server Finder", "กำลังค้นหา...", 2)
-        local ServerFrame = Instance.new("Frame")
-        ServerFrame.Size = UDim2.new(0, 400, 0, 300)
-        ServerFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-        ServerFrame.BackgroundColor3 = Config.BgColor
-        ServerFrame.BackgroundTransparency = 0.1
-        ServerFrame.ZIndex = 50
-        ServerFrame.Parent = ScreenGui
-        Instance.new("UICorner", ServerFrame).CornerRadius = UDim.new(0, 12)
-        local sfTitle = Instance.new("TextLabel")
-        sfTitle.Size = UDim2.new(1, 0, 0, 40)
-        sfTitle.BackgroundTransparency = 1
-        sfTitle.Text = "Server Finder 💻"
-        sfTitle.TextColor3 = Config.TextColor
-        sfTitle.TextSize = 18
-        sfTitle.Font = Enum.Font.GothamBold
-        sfTitle.ZIndex = 51
-        sfTitle.Parent = ServerFrame
-        local sfClose = Instance.new("TextButton")
-        sfClose.Size = UDim2.new(0, 30, 0, 30)
-        sfClose.Position = UDim2.new(1, -35, 0, 5)
-        sfClose.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        sfClose.Text = "X"
-        sfClose.TextColor3 = Color3.fromRGB(255, 255, 255)
-        sfClose.ZIndex = 51
-        sfClose.Parent = ServerFrame
-        Instance.new("UICorner", sfClose).CornerRadius = UDim.new(0, 6)
-        sfClose.MouseButton1Click:Connect(function() ServerFrame:Destroy() end)
-        local sfScroll = Instance.new("ScrollingFrame")
-        sfScroll.Size = UDim2.new(1, -20, 1, -50)
-        sfScroll.Position = UDim2.new(0, 10, 0, 45)
-        sfScroll.BackgroundTransparency = 1
-        sfScroll.ZIndex = 51
-        sfScroll.Parent = ServerFrame
-        local sfLayout = Instance.new("UIListLayout")
-        sfLayout.Padding = UDim.new(0, 5)
-        sfLayout.Parent = sfScroll
         task.spawn(function()
             local cursor = ""
             local found = 0
+            local ServerFrame = Instance.new("Frame")
+            ServerFrame.Size = UDim2.new(0, 400, 0, 300)
+            ServerFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
+            ServerFrame.BackgroundColor3 = Config.BgColor
+            ServerFrame.BackgroundTransparency = 0.1
+            ServerFrame.ZIndex = 50
+            ServerFrame.Parent = ScreenGui
+            Instance.new("UICorner", ServerFrame).CornerRadius = UDim.new(0, 12)
+            local sfTitle = Instance.new("TextLabel")
+            sfTitle.Size = UDim2.new(1, 0, 0, 40)
+            sfTitle.BackgroundTransparency = 1
+            sfTitle.Text = "Server Finder 💻"
+            sfTitle.TextColor3 = Config.TextColor
+            sfTitle.TextSize = 18
+            sfTitle.Font = Enum.Font.GothamBold
+            sfTitle.ZIndex = 51
+            sfTitle.Parent = ServerFrame
+            local sfClose = Instance.new("TextButton")
+            sfClose.Size = UDim2.new(0, 30, 0, 30)
+            sfClose.Position = UDim2.new(1, -35, 0, 5)
+            sfClose.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
+            sfClose.Text = "X"
+            sfClose.TextColor3 = Color3.fromRGB(255, 255, 255)
+            sfClose.ZIndex = 51
+            sfClose.Parent = ServerFrame
+            Instance.new("UICorner", sfClose).CornerRadius = UDim.new(0, 6)
+            sfClose.MouseButton1Click:Connect(function() ServerFrame:Destroy() end)
+            local sfScroll = Instance.new("ScrollingFrame")
+            sfScroll.Size = UDim2.new(1, -20, 1, -50)
+            sfScroll.Position = UDim2.new(0, 10, 0, 45)
+            sfScroll.BackgroundTransparency = 1
+            sfScroll.ZIndex = 51
+            sfScroll.Parent = ServerFrame
+            local sfLayout = Instance.new("UIListLayout")
+            sfLayout.Padding = UDim.new(0, 5)
+            sfLayout.Parent = sfScroll
             while found < 10 do
                 local url = "https://games.roblox.com/v1/games/" .. game.PlaceId .. "/servers/Public?sortOrder=Asc&limit=100&cursor=" .. cursor
                 local success, result = pcall(function() return game:HttpGet(url) end)
@@ -1701,6 +1828,7 @@ RunService.RenderStepped:Connect(function()
                             data.Line.From = originPoint
                             data.Line.To = Vector2.new(screenPoint.X, screenPoint.Y)
                             data.Line.Color = Config.ESP_LineColor
+                            data.Line.Thickness = Config.LineThickness or 1.5
                             data.Line.Visible = true
                             data.Text.Text = player.Name
                             data.Text.Position = Vector2.new(screenPoint.X, screenPoint.Y - 25)
@@ -1720,6 +1848,7 @@ RunService.RenderStepped:Connect(function()
                                 data.Box.Size = Vector2.new(width, height)
                                 data.Box.Position = boxPos
                                 data.Box.Color = Config.ESP_LineColor
+                                data.Box.Thickness = Config.LineThickness or 1.5
                                 data.Box.Visible = true
                                 if Config.ESP_Health then
                                     local humanoid = char.Humanoid
@@ -1769,5 +1898,5 @@ task.spawn(function()
     if LoadingGui then LoadingGui:Destroy() end
     if ToggleButton then ToggleButton.Visible = true end
     if MainFrame then MainFrame.Visible = true end
-    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v38 พร้อมใช้!", 3)
+    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v39 พร้อมใช้!", 3)
 end)
