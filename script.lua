@@ -1,6 +1,6 @@
 -- ==========================================
--- 🐱 แมวส้ม Script Hub - Complete Edition v39
--- (ESP Line + Spawn Pro + Steal Money)
+-- 🐱 แมวส้ม Script Hub - Complete Edition v40
+-- (Fixed Scroll + Close + Spawn Pro)
 -- ==========================================
 
 local Players = game:GetService("Players")
@@ -17,7 +17,6 @@ local TeleportService = game:GetService("TeleportService")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local hasHook = (hookmetamethod ~= nil) and (hookfunction ~= nil)
-local hasGetNamecall = (getnamecallmethod ~= nil)
 
 if LocalPlayer.PlayerGui:FindFirstChild("AnimeScriptHub") then
     LocalPlayer.PlayerGui.AnimeScriptHub:Destroy()
@@ -32,10 +31,11 @@ local Config = {
     BulletHomingEnabled = false, BulletSpeed = 500,
     ESP_Enabled = false, ESP_Box = false, ESP_Health = false,
     ESP_LineColor = Color3.fromRGB(255, 0, 255), ESP_LineMode = "Bottom",
+    LineThickness = 1.5,
     SpeedEnabled = false, SpeedValue = 500, SpeedBypass = true,
     FlyEnabled = false, FlySpeed = 100, FlyHeight = 20,
     SpinEnabled = false, SpinSpeed = 5,
-    AntiLagEnabled = false, Graphics4KEnabled = false, Sky4KEnabled = false, RTXEnabled = false,
+    AntiLagEnabled = false,
     AFKEnabled = false,
     CollectRadius = 30,
     AntiDropEnabled = false, StealDelay = 1,
@@ -211,162 +211,122 @@ local function IsTargetInFOV()
 end
 
 -- ==========================================
--- ระบบขโมยไข่
+-- ✅ ระบบสแกนหาไอเทมในแมพ (ใหม่)
 -- ==========================================
-local Stealing = false
-
-local function FindNearestEgg()
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
-    local hrp = char.HumanoidRootPart
-    local nearest = nil
-    local shortest = Config.CollectRadius
+local function ScanMapItems()
+    local items = {}
+    local seen = {}
+    
+    -- สแกนจาก Workspace
     for _, obj in pairs(Workspace:GetDescendants()) do
-        if obj:IsA("BasePart") or obj:IsA("Model") then
-            local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
-            if part and part ~= hrp then
-                local name = string.lower(obj.Name)
-                if string.find(name, "egg") or string.find(name, "steal") or string.find(name, "pet") then
-                    local dist = (part.Position - hrp.Position).Magnitude
-                    if dist < shortest then
-                        shortest = dist
-                        nearest = part
+        if obj:IsA("BasePart") or obj:IsA("Model") or obj:IsA("Tool") then
+            local name = obj.Name
+            if name and #name > 0 and #name < 40 then
+                local nameLower = string.lower(name)
+                local keywords = {"egg", "pet", "sword", "gun", "knife", "weapon", "tool", "item",
+                    "crate", "chest", "coin", "gem", "cash", "reward", "candy", "food",
+                    "toy", "ball", "potion", "magic", "crystal", "orb", "fruit", "seed"}
+                for _, kw in ipairs(keywords) do
+                    if string.find(nameLower, kw) then
+                        if not seen[name] then
+                            seen[name] = true
+                            table.insert(items, {Name = name, Obj = obj, Type = "Workspace"})
+                        end
+                        break
                     end
                 end
             end
         end
     end
-    return nearest
-end
-
-local function StealEggOnce()
-    if Stealing then
-        SendNotification("ขโมยไข่", "กำลังขโมยอยู่...", 2)
-        return
-    end
-    local char = LocalPlayer.Character
-    if not char or not char:FindFirstChild("HumanoidRootPart") then
-        SendNotification("ขโมยไข่", "ไม่พบตัวละคร", 2)
-        return
-    end
-    Stealing = true
-    SendNotification("ขโมยไข่", "กำลังเก็บไข่... (รอ " .. Config.StealDelay .. " วิ)", 2)
-    task.wait(Config.StealDelay)
-    local hrp = char.HumanoidRootPart
-    local originalCFrame = hrp.CFrame
-    local egg = FindNearestEgg()
-    if not egg then
-        SendNotification("ขโมยไข่", "ไม่พบไข่ในระยะ", 2)
-        Stealing = false
-        return
-    end
-    pcall(function() hrp.CFrame = CFrame.new(egg.Position) end)
-    task.wait(0.1)
-    pcall(function() hrp.CFrame = originalCFrame end)
-    task.wait(0.1)
-    Stealing = false
-    SendNotification("ขโมยไข่", "เก็บไข่สำเร็จ!", 2)
-end
-
-local AntiDropConnection = nil
-local function EnableAntiDrop()
-    AntiDropConnection = RunService.Heartbeat:Connect(function()
-        if not Config.AntiDropEnabled then
-            if AntiDropConnection then AntiDropConnection:Disconnect() end
-            return
-        end
-        local char = LocalPlayer.Character
-        if not char then return end
-        local tool = char:FindFirstChildOfClass("Tool")
-        if tool then
-            local name = string.lower(tool.Name)
-            if string.find(name, "egg") or string.find(name, "steal") or string.find(name, "pet") then
-                pcall(function()
-                    if tool.Parent ~= char then tool.Parent = char end
-                    if tool:FindFirstChild("Handle") then
-                        tool.Handle.CanCollide = false
-                    end
-                end)
+    
+    -- สแกนจาก ReplicatedStorage (Items ที่เสกได้)
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") or obj:IsA("Tool") or obj:IsA("Folder") then
+            local name = obj.Name
+            if name and #name > 0 and #name < 40 then
+                if not seen[name] then
+                    seen[name] = true
+                    table.insert(items, {Name = name, Obj = obj, Type = "ReplicatedStorage"})
+                end
             end
         end
-    end)
-end
-local function DisableAntiDrop()
-    if AntiDropConnection then AntiDropConnection:Disconnect(); AntiDropConnection = nil end
-end
-
--- ==========================================
--- ✅ ระบบดึงเงินจากผู้เล่น (Steal Money)
--- ==========================================
-local MoneyStealing = false
-
-local function FindMoneyRemotes()
-    local remotes = {}
-    local keywords = {"money", "cash", "coin", "steal", "rob", "take", "grab", "claim", "transfer"}
+    end
+    
+    -- สแกน Remote ที่เกี่ยวกับการเสก
     for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
         if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-            local name = string.lower(obj.Name)
+            local name = obj.Name
+            local nameLower = string.lower(name)
+            local keywords = {"spawn", "give", "create", "summon", "buy", "get", "item", "egg", "pet"}
             for _, kw in ipairs(keywords) do
-                if string.find(name, kw) then
-                    table.insert(remotes, obj)
+                if string.find(nameLower, kw) then
+                    if not seen["R_" .. name] then
+                        seen["R_" .. name] = true
+                        table.insert(items, {Name = name, Obj = obj, Type = "Remote"})
+                    end
                     break
                 end
             end
         end
     end
-    return remotes
+    
+    table.sort(items, function(a, b) return a.Name < b.Name end)
+    return items
 end
 
-local function StealMoneyFromPlayer(targetPlayer)
-    if not targetPlayer or not targetPlayer.Character then
-        SendNotification("ดึงเงิน", "ไม่พบเป้าหมาย", 2)
-        return
-    end
+-- ✅ ฟังก์ชันเสกของจริง
+local function SpawnItem(itemData)
+    if not itemData then return end
+    local name = itemData.Name
+    local obj = itemData.Obj
+    local objType = itemData.Type
     
-    local targetChar = targetPlayer.Character
-    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
-    if not targetHRP then
-        SendNotification("ดึงเงิน", "ไม่พบตำแหน่งเป้าหมาย", 2)
-        return
-    end
+    SendNotification("เสกของ", "กำลังเสก: " .. name, 2)
     
-    local remotes = FindMoneyRemotes()
-    if #remotes == 0 then
-        SendNotification("ดึงเงิน", "❌ ไม่พบ Remote เกี่ยวกับเงิน", 3)
-        return
-    end
-    
-    local targetName = targetPlayer.Name
-    SendNotification("ดึงเงิน", "กำลังดึงจาก: " .. targetName, 2)
-    
-    local myChar = LocalPlayer.Character
-    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
-    
-    -- ยิง Remote ทุกตัวที่เจอ
-    for _, remote in ipairs(remotes) do
+    if objType == "Remote" then
+        -- ถ้าเป็น Remote Event → ยิง
         pcall(function()
-            -- ลองส่งแบบต่างๆ
-            remote:FireServer(targetPlayer)
-            remote:FireServer(targetChar)
-            remote:FireServer(targetPlayer.UserId)
-            remote:FireServer(targetName)
-            remote:FireServer(targetHRP.Position)
-            remote:FireServer(targetHRP.CFrame)
-            if myHRP then
-                remote:FireServer(myHRP.CFrame, targetHRP.CFrame)
-                remote:FireServer(myHRP.Position, targetHRP.Position)
-            end
-            remote:FireServer(targetPlayer, 1)
-            remote:FireServer(targetPlayer, 999999)
-            remote:FireServer(targetPlayer.UserId, 999999)
+            obj:FireServer()
+            obj:FireServer(name)
+            obj:FireServer(1)
+            obj:FireServer(name, 1)
+            obj:FireServer(LocalPlayer)
+            obj:FireServer(LocalPlayer, name)
         end)
+        SendNotification("เสกของ", "✅ ยิง Remote: " .. name, 2)
+        return
     end
     
-    SendNotification("ดึงเงิน", "✅ ยิง Remote " .. #remotes .. " ตัวใส่ " .. targetName, 3)
+    -- ถ้าเป็น Item ปกติ → ลองหา Remote ที่เสกได้
+    local remotes = {}
+    for _, remote in pairs(ReplicatedStorage:GetDescendants()) do
+        if remote:IsA("RemoteEvent") or remote:IsA("RemoteFunction") then
+            local rName = string.lower(remote.Name)
+            if string.find(rName, "spawn") or string.find(rName, "give") or
+               string.find(rName, "create") or string.find(rName, "summon") then
+                table.insert(remotes, remote)
+            end
+        end
+    end
+    
+    if #remotes > 0 then
+        for _, remote in ipairs(remotes) do
+            pcall(function()
+                remote:FireServer(name)
+                remote:FireServer(name, 1)
+                remote:FireServer(name, 1, true)
+                remote:FireServer(name, Vector3.new(0, 0, 0))
+                remote:FireServer(LocalPlayer, name)
+            end)
+        end
+        SendNotification("เสกของ", "✅ ยิง " .. #remotes .. " Remote ให้: " .. name, 3)
+    else
+        SendNotification("เสกของ", "⚠️ ไม่พบ Remote สำหรับเสก", 3)
+    end
 end
 
 -- ==========================================
--- FPS Counter RGB
+-- FPS Counter
 -- ==========================================
 local FPSLabel = Instance.new("TextLabel")
 FPSLabel.Size = UDim2.new(0, 120, 0, 30)
@@ -381,11 +341,6 @@ FPSLabel.Visible = false
 FPSLabel.ZIndex = 150
 FPSLabel.Parent = ScreenGui
 Instance.new("UICorner", FPSLabel).CornerRadius = UDim.new(0, 6)
-local fpsStroke = Instance.new("UIStroke")
-fpsStroke.Color = Config.ThemeColor
-fpsStroke.Thickness = 1.5
-fpsStroke.Transparency = 0.3
-fpsStroke.Parent = FPSLabel
 
 local function HSVtoRGB(h, s, v)
     local r, g, b
@@ -402,14 +357,6 @@ local function HSVtoRGB(h, s, v)
     elseif i == 4 then r, g, b = t, p, v
     elseif i == 5 then r, g, b = v, p, q end
     return Color3.new(r, g, b)
-end
-
-local function UpdateFPSPosition(pos)
-    Config.FPSPosition = pos
-    if pos == "TopLeft" then FPSLabel.Position = UDim2.new(0, 10, 0, 10)
-    elseif pos == "TopRight" then FPSLabel.Position = UDim2.new(1, -130, 0, 10)
-    elseif pos == "BottomLeft" then FPSLabel.Position = UDim2.new(0, 10, 1, -40)
-    elseif pos == "BottomRight" then FPSLabel.Position = UDim2.new(1, -130, 1, -40) end
 end
 
 task.spawn(function()
@@ -544,17 +491,21 @@ HeaderTitle.TextXAlignment = Enum.TextXAlignment.Left
 HeaderTitle.ZIndex = 3
 HeaderTitle.Parent = HeaderBar
 local CloseBtn = Instance.new("TextButton")
-CloseBtn.Size = UDim2.new(0, 30, 0, 30)
-CloseBtn.Position = UDim2.new(1, -40, 0.5, -15)
-CloseBtn.BackgroundTransparency = 1
+CloseBtn.Size = UDim2.new(0, 35, 0, 35)
+CloseBtn.Position = UDim2.new(1, -45, 0.5, -17.5)
+CloseBtn.BackgroundColor3 = Color3.fromRGB(255, 80, 80)
 CloseBtn.Text = "X"
-CloseBtn.TextColor3 = Color3.fromRGB(255, 80, 80)
-CloseBtn.TextSize = 20
+CloseBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+CloseBtn.TextSize = 18
 CloseBtn.Font = Enum.Font.GothamBold
-CloseBtn.ZIndex = 5
+CloseBtn.ZIndex = 10
 CloseBtn.Active = true
+CloseBtn.AutoButtonColor = false
 CloseBtn.Parent = HeaderBar
-CloseBtn.MouseButton1Click:Connect(function() MainFrame.Visible = false end)
+Instance.new("UICorner", CloseBtn).CornerRadius = UDim.new(0, 8)
+CloseBtn.MouseButton1Click:Connect(function() 
+    MainFrame.Visible = false
+end)
 
 -- Drag
 local dragging = false
@@ -578,18 +529,34 @@ UserInputService.InputChanged:Connect(function(input)
     end
 end)
 
--- Sidebar
-local Sidebar = Instance.new("Frame")
+-- ==========================================
+-- ✅ Sidebar (มี Scroll ได้)
+-- ==========================================
+local Sidebar = Instance.new("ScrollingFrame")
 Sidebar.Size = UDim2.new(0, 140, 1, -50)
 Sidebar.Position = UDim2.new(0, 0, 0, 50)
 Sidebar.BackgroundColor3 = Config.BgColor
 Sidebar.BackgroundTransparency = 0.6
 Sidebar.ZIndex = 2
+Sidebar.BorderSizePixel = 0
+Sidebar.ScrollBarThickness = 3
+Sidebar.ScrollBarImageColor3 = Config.ThemeColor
+Sidebar.CanvasSize = UDim2.new(0, 0, 0, 0)
 Sidebar.Parent = MainFrame
 local sidebarLayout = Instance.new("UIListLayout")
 sidebarLayout.SortOrder = Enum.SortOrder.LayoutOrder
 sidebarLayout.Padding = UDim.new(0, 5)
 sidebarLayout.Parent = Sidebar
+local sidebarPadding = Instance.new("UIPadding")
+sidebarPadding.PaddingTop = UDim.new(0, 5)
+sidebarPadding.PaddingLeft = UDim.new(0, 5)
+sidebarPadding.PaddingRight = UDim.new(0, 5)
+sidebarPadding.Parent = Sidebar
+
+-- อัปเดต CanvasSize อัตโนมัติ
+sidebarLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    Sidebar.CanvasSize = UDim2.new(0, 0, 0, sidebarLayout.AbsoluteContentSize.Y + 10)
+end)
 
 local ContentContainer = Instance.new("Frame")
 ContentContainer.Size = UDim2.new(1, -140, 1, -50)
@@ -611,10 +578,6 @@ ToggleButton.AutoButtonColor = false
 ToggleButton.ZIndex = 100
 ToggleButton.Parent = ScreenGui
 Instance.new("UICorner", ToggleButton).CornerRadius = UDim.new(1, 0)
-local btnStroke = Instance.new("UIStroke")
-btnStroke.Color = Config.ThemeColor
-btnStroke.Thickness = 2
-btnStroke.Parent = ToggleButton
 
 local btnDragging = false
 local btnDragStart, btnStartPos
@@ -647,17 +610,18 @@ end)
 -- ==========================================
 local function CreateSidebarButton(name, order, callback)
     local btn = Instance.new("TextButton")
-    btn.Size = UDim2.new(1, 0, 0, 45)
+    btn.Size = UDim2.new(1, 0, 0, 42)
     btn.BackgroundColor3 = Config.BgColor
     btn.BackgroundTransparency = 0.8
-    btn.Text = "   " .. name
+    btn.Text = "  " .. name
     btn.TextColor3 = Config.TextDim
-    btn.TextSize = 14
+    btn.TextSize = 13
     btn.Font = Enum.Font.Gotham
     btn.TextXAlignment = Enum.TextXAlignment.Left
     btn.LayoutOrder = order
     btn.ZIndex = 3
     btn.Active = true
+    btn.AutoButtonColor = false
     btn.Parent = Sidebar
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     local indicator = Instance.new("Frame")
@@ -710,6 +674,7 @@ local function CreateToggle(parent, text, flagName, defaultState, callback)
     toggleBtn.Text = ""
     toggleBtn.ZIndex = 6
     toggleBtn.Active = true
+    toggleBtn.AutoButtonColor = false
     toggleBtn.Parent = container
     Instance.new("UICorner", toggleBtn).CornerRadius = UDim.new(1, 0)
     local knob = Instance.new("Frame")
@@ -842,6 +807,7 @@ local function CreateButton(parent, text, callback)
     btn.Font = Enum.Font.GothamBold
     btn.ZIndex = 6
     btn.Active = true
+    btn.AutoButtonColor = false
     btn.Parent = parent
     Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 8)
     btn.MouseButton1Click:Connect(callback)
@@ -863,11 +829,15 @@ local function CreatePage(title)
     page.ScrollBarThickness = 3
     page.ScrollBarImageColor3 = Config.ThemeColor
     page.ZIndex = 3
+    page.CanvasSize = UDim2.new(0, 0, 0, 0)
     page.Parent = ContentContainer
     local layout = Instance.new("UIListLayout")
     layout.SortOrder = Enum.SortOrder.LayoutOrder
     layout.Padding = UDim.new(0, 10)
     layout.Parent = page
+    layout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        page.CanvasSize = UDim2.new(0, 0, 0, layout.AbsoluteContentSize.Y + 20)
+    end)
     local header = Instance.new("TextLabel")
     header.Size = UDim2.new(1, 0, 0, 30)
     header.BackgroundTransparency = 1
@@ -901,7 +871,147 @@ end
 Players.PlayerRemoving:Connect(RemoveESP)
 
 -- ==========================================
--- Anti-Lag / AFK / Graphics
+-- ระบบขโมยไข่
+-- ==========================================
+local Stealing = false
+
+local function FindNearestEgg()
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then return nil end
+    local hrp = char.HumanoidRootPart
+    local nearest = nil
+    local shortest = Config.CollectRadius
+    for _, obj in pairs(Workspace:GetDescendants()) do
+        if obj:IsA("BasePart") or obj:IsA("Model") then
+            local part = obj:IsA("BasePart") and obj or obj:FindFirstChildWhichIsA("BasePart")
+            if part and part ~= hrp then
+                local name = string.lower(obj.Name)
+                if string.find(name, "egg") or string.find(name, "steal") or string.find(name, "pet") then
+                    local dist = (part.Position - hrp.Position).Magnitude
+                    if dist < shortest then
+                        shortest = dist
+                        nearest = part
+                    end
+                end
+            end
+        end
+    end
+    return nearest
+end
+
+local function StealEggOnce()
+    if Stealing then
+        SendNotification("ขโมยไข่", "กำลังขโมยอยู่...", 2)
+        return
+    end
+    local char = LocalPlayer.Character
+    if not char or not char:FindFirstChild("HumanoidRootPart") then
+        SendNotification("ขโมยไข่", "ไม่พบตัวละคร", 2)
+        return
+    end
+    Stealing = true
+    SendNotification("ขโมยไข่", "กำลังเก็บไข่...", 2)
+    task.wait(Config.StealDelay)
+    local hrp = char.HumanoidRootPart
+    local originalCFrame = hrp.CFrame
+    local egg = FindNearestEgg()
+    if not egg then
+        SendNotification("ขโมยไข่", "ไม่พบไข่ในระยะ", 2)
+        Stealing = false
+        return
+    end
+    pcall(function() hrp.CFrame = CFrame.new(egg.Position) end)
+    task.wait(0.1)
+    pcall(function() hrp.CFrame = originalCFrame end)
+    task.wait(0.1)
+    Stealing = false
+    SendNotification("ขโมยไข่", "เก็บไข่สำเร็จ!", 2)
+end
+
+local AntiDropConnection = nil
+local function EnableAntiDrop()
+    AntiDropConnection = RunService.Heartbeat:Connect(function()
+        if not Config.AntiDropEnabled then
+            if AntiDropConnection then AntiDropConnection:Disconnect() end
+            return
+        end
+        local char = LocalPlayer.Character
+        if not char then return end
+        local tool = char:FindFirstChildOfClass("Tool")
+        if tool then
+            local name = string.lower(tool.Name)
+            if string.find(name, "egg") or string.find(name, "steal") or string.find(name, "pet") then
+                pcall(function()
+                    if tool.Parent ~= char then tool.Parent = char end
+                    if tool:FindFirstChild("Handle") then
+                        tool.Handle.CanCollide = false
+                    end
+                end)
+            end
+        end
+    end)
+end
+local function DisableAntiDrop()
+    if AntiDropConnection then AntiDropConnection:Disconnect(); AntiDropConnection = nil end
+end
+
+-- ==========================================
+-- ระบบดึงเงินจากผู้เล่น
+-- ==========================================
+local function FindMoneyRemotes()
+    local remotes = {}
+    local keywords = {"money", "cash", "coin", "steal", "rob", "take", "grab", "claim", "transfer"}
+    for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
+        if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
+            local name = string.lower(obj.Name)
+            for _, kw in ipairs(keywords) do
+                if string.find(name, kw) then
+                    table.insert(remotes, obj)
+                    break
+                end
+            end
+        end
+    end
+    return remotes
+end
+
+local function StealMoneyFromPlayer(targetPlayer)
+    if not targetPlayer or not targetPlayer.Character then
+        SendNotification("ดึงเงิน", "ไม่พบเป้าหมาย", 2)
+        return
+    end
+    local targetChar = targetPlayer.Character
+    local targetHRP = targetChar:FindFirstChild("HumanoidRootPart")
+    if not targetHRP then
+        SendNotification("ดึงเงิน", "ไม่พบตำแหน่งเป้าหมาย", 2)
+        return
+    end
+    local remotes = FindMoneyRemotes()
+    if #remotes == 0 then
+        SendNotification("ดึงเงิน", "❌ ไม่พบ Remote เงิน", 3)
+        return
+    end
+    SendNotification("ดึงเงิน", "กำลังดึงจาก: " .. targetPlayer.Name, 2)
+    local myChar = LocalPlayer.Character
+    local myHRP = myChar and myChar:FindFirstChild("HumanoidRootPart")
+    for _, remote in ipairs(remotes) do
+        pcall(function()
+            remote:FireServer(targetPlayer)
+            remote:FireServer(targetChar)
+            remote:FireServer(targetPlayer.UserId)
+            remote:FireServer(targetPlayer.Name)
+            remote:FireServer(targetHRP.Position)
+            if myHRP then
+                remote:FireServer(myHRP.CFrame, targetHRP.CFrame)
+            end
+            remote:FireServer(targetPlayer, 999999)
+        end)
+    end
+    SendNotification("ดึงเงิน", "✅ ยิง Remote " .. #remotes .. " ตัวใส่ " .. targetPlayer.Name, 3)
+end
+
+-- ==========================================
+-- Anti-Lag / AFK
 -- ==========================================
 local AntiLagConnection = nil
 local AFKConnection = nil
@@ -927,10 +1037,6 @@ local function EnableAntiLag()
 end
 local function DisableAntiLag()
     pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Automatic end)
-    pcall(function()
-        Lighting.GlobalShadows = true
-        Lighting.Brightness = 2
-    end)
     if AntiLagConnection then AntiLagConnection:Disconnect(); AntiLagConnection = nil end
 end
 
@@ -953,9 +1059,9 @@ local function DisableAFK()
 end
 
 -- ==========================================
--- Silent Aim Hooks
+-- Silent Aim Hook
 -- ==========================================
-if hasHook and hasGetNamecall then
+if hasHook then
     pcall(function()
         local oldNamecall
         oldNamecall = hookmetamethod(game, "__namecall", function(self, ...)
@@ -1012,19 +1118,18 @@ CreateSidebarButton("🏠 หน้าหลัก", 1, function()
     CreateToggle(page, "🚀 Silent Aim", "BulletHomingEnabled", false, function(state)
         if FOVCircle then FOVCircle.Visible = state end
     end)
-    CreateSlider(page, "⚡ ความเร็วกระสุน", 100, 1500, "BulletSpeed", 500, function(value) end)
 end)
 
 -- ==========================================
--- ✅ เมนู: ดึงเงินจากผู้เล่น (ใหม่)
+-- ✅ เมนู: เสกของ (สแกน + กดเสก)
 -- ==========================================
-CreateSidebarButton("💰 ดึงเงิน", 2, function()
-    local page = CreatePage("ดึงเงินจากผู้เล่น")
+CreateSidebarButton("🎁 เสกของ", 2, function()
+    local page = CreatePage("เสกของ (Spawn Item)")
     
     local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, 0, 0, 60)
+    info.Size = UDim2.new(1, 0, 0, 50)
     info.BackgroundTransparency = 1
-    info.Text = "ระบบดึงเงินจากผู้เล่น\nใช้ Remote ที่เกี่ยวกับเงินในการดึง\n(อาจไม่ทำงานกับทุกเกม)"
+    info.Text = "กดสแกน → เลือกของ → กดเสกทันที"
     info.TextColor3 = Config.TextDim
     info.TextSize = 12
     info.Font = Enum.Font.Gotham
@@ -1032,6 +1137,141 @@ CreateSidebarButton("💰 ดึงเงิน", 2, function()
     info.ZIndex = 3
     info.Parent = page
     
+    -- Container แสดงของ
+    local itemListFrame = Instance.new("ScrollingFrame")
+    itemListFrame.Size = UDim2.new(1, 0, 0, 300)
+    itemListFrame.BackgroundColor3 = Config.BgColor
+    itemListFrame.BackgroundTransparency = 0.7
+    itemListFrame.BorderSizePixel = 0
+    itemListFrame.ScrollBarThickness = 3
+    itemListFrame.ScrollBarImageColor3 = Config.ThemeColor
+    itemListFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+    itemListFrame.ZIndex = 3
+    itemListFrame.Parent = page
+    Instance.new("UICorner", itemListFrame).CornerRadius = UDim.new(0, 8)
+    local listLayout = Instance.new("UIListLayout")
+    listLayout.SortOrder = Enum.SortOrder.LayoutOrder
+    listLayout.Padding = UDim.new(0, 5)
+    listLayout.Parent = itemListFrame
+    listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+        itemListFrame.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 10)
+    end)
+    
+    -- ✅ ปุ่มสแกน
+    local scanBtn = Instance.new("TextButton")
+    scanBtn.Size = UDim2.new(1, 0, 0, 50)
+    scanBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
+    scanBtn.Text = "🔍 สแกนหาไอเทมในแมพ"
+    scanBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    scanBtn.TextSize = 16
+    scanBtn.Font = Enum.Font.GothamBold
+    scanBtn.ZIndex = 6
+    scanBtn.Active = true
+    scanBtn.AutoButtonColor = false
+    scanBtn.Parent = page
+    Instance.new("UICorner", scanBtn).CornerRadius = UDim.new(0, 10)
+    
+    scanBtn.MouseButton1Click:Connect(function()
+        SendNotification("สแกน", "กำลังสแกนหาไอเทม...", 2)
+        scanBtn.Text = "⏳ กำลังสแกน..."
+        
+        -- ล้างของเก่า
+        for _, v in pairs(itemListFrame:GetChildren()) do
+            if v:IsA("TextButton") then v:Destroy() end
+        end
+        
+        task.wait(0.3)
+        local items = ScanMapItems()
+        
+        if #items == 0 then
+            local noItem = Instance.new("TextLabel")
+            noItem.Size = UDim2.new(1, 0, 0, 40)
+            noItem.BackgroundTransparency = 1
+            noItem.Text = "❌ ไม่พบไอเทม"
+            noItem.TextColor3 = Color3.fromRGB(255, 100, 100)
+            noItem.TextSize = 14
+            noItem.Font = Enum.Font.Gotham
+            noItem.Parent = itemListFrame
+            scanBtn.Text = "🔍 สแกนหาไอเทมในแมพ"
+            SendNotification("สแกน", "ไม่พบไอเทม", 2)
+            return
+        end
+        
+        -- แสดงของที่เจอ
+        for i, item in ipairs(items) do
+            local itemBtn = Instance.new("TextButton")
+            itemBtn.Size = UDim2.new(1, -10, 0, 40)
+            itemBtn.BackgroundColor3 = Color3.fromRGB(60, 50, 90)
+            itemBtn.Text = "🎁 " .. item.Name .. "  [" .. item.Type .. "]"
+            itemBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+            itemBtn.TextSize = 12
+            itemBtn.Font = Enum.Font.GothamBold
+            itemBtn.TextXAlignment = Enum.TextXAlignment.Left
+            itemBtn.ZIndex = 5
+            itemBtn.Active = true
+            itemBtn.AutoButtonColor = false
+            itemBtn.Parent = itemListFrame
+            Instance.new("UICorner", itemBtn).CornerRadius = UDim.new(0, 6)
+            
+            -- ✅ กดแล้วเสกทันที
+            itemBtn.MouseButton1Click:Connect(function()
+                SpawnItem(item)
+            end)
+        end
+        
+        scanBtn.Text = "🔍 สแกนหาไอเทมในแมพ"
+        SendNotification("สแกน", "พบ " .. #items .. " ไอเทม - กดเพื่อเสก", 3)
+    end)
+    
+    -- ช่องใส่ชื่อเอง
+    local customBox = Instance.new("TextBox")
+    customBox.Size = UDim2.new(1, 0, 0, 35)
+    customBox.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
+    customBox.Text = ""
+    customBox.PlaceholderText = "ใส่ชื่อของเอง"
+    customBox.TextColor3 = Config.TextColor
+    customBox.Font = Enum.Font.Gotham
+    customBox.TextSize = 13
+    customBox.ZIndex = 6
+    customBox.Parent = page
+    Instance.new("UICorner", customBox).CornerRadius = UDim.new(0, 6)
+    
+    CreateButton(page, "🎁 เสกของที่ใส่เอง", function()
+        if customBox.Text ~= "" then
+            SpawnItem({Name = customBox.Text, Obj = nil, Type = "Custom"})
+        end
+    end)
+end)
+
+-- ==========================================
+-- เมนู: ขโมยไข่
+-- ==========================================
+CreateSidebarButton("🥚 ขโมยไข่", 3, function()
+    local page = CreatePage("ขโมยไข่")
+    local stealBtn = Instance.new("TextButton")
+    stealBtn.Size = UDim2.new(1, 0, 0, 55)
+    stealBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
+    stealBtn.Text = "🥚 ขโมยไข่ (กด)"
+    stealBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+    stealBtn.TextSize = 16
+    stealBtn.Font = Enum.Font.GothamBold
+    stealBtn.ZIndex = 6
+    stealBtn.Parent = page
+    Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 10)
+    stealBtn.MouseButton1Click:Connect(function() StealEggOnce() end)
+    
+    CreateSlider(page, "⏱️ เวลารอ", 1, 5, "StealDelay", 1, function(value) Config.StealDelay = value end)
+    CreateSlider(page, "📦 รัศมี", 10, 200, "CollectRadius", 30, function(value) Config.CollectRadius = value end)
+    CreateToggle(page, "🛡️ กันไข่ตก", "AntiDropEnabled", false, function(state)
+        if state then EnableAntiDrop() else DisableAntiDrop() end
+    end)
+end)
+
+-- ==========================================
+-- เมนู: ดึงเงิน
+-- ==========================================
+CreateSidebarButton("💰 ดึงเงิน", 4, function()
+    local page = CreatePage("ดึงเงินจากผู้เล่น")
     local playerListFrame = Instance.new("Frame")
     playerListFrame.Size = UDim2.new(1, 0, 0, 300)
     playerListFrame.BackgroundColor3 = Config.BgColor
@@ -1057,7 +1297,6 @@ CreateSidebarButton("💰 ดึงเงิน", 2, function()
                 row.ZIndex = 4
                 row.Parent = playerListFrame
                 Instance.new("UICorner", row).CornerRadius = UDim.new(0, 6)
-                
                 local nameLabel = Instance.new("TextLabel")
                 nameLabel.Size = UDim2.new(0.55, 0, 1, 0)
                 nameLabel.Position = UDim2.new(0, 5, 0, 0)
@@ -1069,7 +1308,6 @@ CreateSidebarButton("💰 ดึงเงิน", 2, function()
                 nameLabel.TextXAlignment = Enum.TextXAlignment.Left
                 nameLabel.ZIndex = 5
                 nameLabel.Parent = row
-                
                 local stealBtn = Instance.new("TextButton")
                 stealBtn.Size = UDim2.new(0, 80, 0, 32)
                 stealBtn.Position = UDim2.new(1, -90, 0.5, -16)
@@ -1081,254 +1319,17 @@ CreateSidebarButton("💰 ดึงเงิน", 2, function()
                 stealBtn.ZIndex = 5
                 stealBtn.Parent = row
                 Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 6)
-                
                 stealBtn.MouseButton1Click:Connect(function()
                     StealMoneyFromPlayer(player)
                 end)
             end
         end
     end
-    
-    CreateButton(page, "🔄 รีเฟรชรายชื่อ", function()
-        RefreshPlayerList()
-        SendNotification("ดึงเงิน", "รีเฟรชรายชื่อแล้ว", 2)
-    end)
-    
-    CreateButton(page, "🔍 สแกน Remote เกี่ยวกับเงิน", function()
-        local remotes = FindMoneyRemotes()
-        if #remotes == 0 then
-            SendNotification("สแกน", "❌ ไม่พบ Remote เกี่ยวกับเงิน", 3)
-        else
-            local names = ""
-            for i, r in ipairs(remotes) do
-                names = names .. r.Name .. "\n"
-            end
-            SendNotification("สแกน", "พบ " .. #remotes .. " Remote:\n" .. names, 5)
-        end
-    end)
-    
+    CreateButton(page, "🔄 รีเฟรชรายชื่อ", function() RefreshPlayerList() end)
     Players.PlayerAdded:Connect(function() task.wait(0.5); RefreshPlayerList() end)
     Players.PlayerRemoving:Connect(function() task.wait(0.5); RefreshPlayerList() end)
     task.wait(0.1)
     RefreshPlayerList()
-end)
-
--- ==========================================
--- ✅ เมนู: เสกของ (Pro)
--- ==========================================
-CreateSidebarButton("🎁 เสกของ", 3, function()
-    local page = CreatePage("เสกของ (Spawn Item)")
-    
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, 0, 0, 60)
-    info.BackgroundTransparency = 1
-    info.Text = "ใช้ Remote Spy ดูชื่อ Remote + Argument\nแล้วใส่ในช่องด้านล่าง"
-    info.TextColor3 = Config.TextDim
-    info.TextSize = 12
-    info.Font = Enum.Font.Gotham
-    info.TextWrapped = true
-    info.ZIndex = 3
-    info.Parent = page
-    
-    local remoteBox = Instance.new("TextBox")
-    remoteBox.Size = UDim2.new(1, 0, 0, 35)
-    remoteBox.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-    remoteBox.Text = ""
-    remoteBox.PlaceholderText = "📡 ชื่อ Remote"
-    remoteBox.TextColor3 = Config.TextColor
-    remoteBox.Font = Enum.Font.Gotham
-    remoteBox.TextSize = 13
-    remoteBox.ZIndex = 6
-    remoteBox.Parent = page
-    Instance.new("UICorner", remoteBox).CornerRadius = UDim.new(0, 6)
-    
-    local argBox = Instance.new("TextBox")
-    argBox.Size = UDim2.new(1, 0, 0, 35)
-    argBox.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-    argBox.Text = ""
-    argBox.PlaceholderText = "📦 Argument (คั่นด้วย , )"
-    argBox.TextColor3 = Config.TextColor
-    argBox.Font = Enum.Font.Gotham
-    argBox.TextSize = 13
-    argBox.ZIndex = 6
-    argBox.Parent = page
-    Instance.new("UICorner", argBox).CornerRadius = UDim.new(0, 6)
-    
-    local spawnBtn = Instance.new("TextButton")
-    spawnBtn.Size = UDim2.new(1, 0, 0, 50)
-    spawnBtn.BackgroundColor3 = Color3.fromRGB(80, 200, 80)
-    spawnBtn.Text = "🎁 เสกของ (ยิง Remote)"
-    spawnBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    spawnBtn.TextSize = 16
-    spawnBtn.Font = Enum.Font.GothamBold
-    spawnBtn.ZIndex = 6
-    spawnBtn.Parent = page
-    Instance.new("UICorner", spawnBtn).CornerRadius = UDim.new(0, 10)
-    
-    spawnBtn.MouseButton1Click:Connect(function()
-        local remoteName = remoteBox.Text
-        local argText = argBox.Text
-        
-        if remoteName == "" then
-            SendNotification("เสกของ", "กรุณาใส่ชื่อ Remote", 2)
-            return
-        end
-        
-        -- ค้นหา Remote ทุกที่
-        local foundRemotes = {}
-        local sources = {ReplicatedStorage, Workspace, game:GetService("ServerStorage"), LocalPlayer:FindFirstChildOfClass("PlayerGui")}
-        for _, source in pairs(sources) do
-            if source then
-                for _, obj in pairs(source:GetDescendants()) do
-                    if (obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction")) and obj.Name == remoteName then
-                        table.insert(foundRemotes, obj)
-                    end
-                end
-            end
-        end
-        
-        if #foundRemotes == 0 then
-            SendNotification("เสกของ", "❌ ไม่พบ Remote: " .. remoteName, 3)
-            return
-        end
-        
-        -- แปลง Argument
-        local args = {}
-        if argText ~= "" then
-            for arg in string.gmatch(argText, "([^,]+)") do
-                local trimmed = string.match(arg, "^%s*(.-)%s*$")
-                local num = tonumber(trimmed)
-                if num then
-                    table.insert(args, num)
-                elseif trimmed == "true" then
-                    table.insert(args, true)
-                elseif trimmed == "false" then
-                    table.insert(args, false)
-                else
-                    table.insert(args, trimmed)
-                end
-            end
-        end
-        
-        -- ยิงทุก Remote ที่เจอ
-        for _, remote in ipairs(foundRemotes) do
-            pcall(function()
-                if #args > 0 then
-                    remote:FireServer(unpack(args))
-                    remote:InvokeServer(unpack(args))
-                else
-                    remote:FireServer()
-                    remote:InvokeServer()
-                end
-            end)
-        end
-        
-        SendNotification("เสกของ", "✅ ยิง " .. #foundRemotes .. " Remote", 2)
-    end)
-    
-    -- ปุ่มสแกน
-    CreateButton(page, "🔍 สแกน Remote ทั้งหมด", function()
-        SendNotification("สแกน", "กำลังสแกน...", 2)
-        local scanFrame = Instance.new("Frame")
-        scanFrame.Size = UDim2.new(0, 400, 0, 300)
-        scanFrame.Position = UDim2.new(0.5, -200, 0.5, -150)
-        scanFrame.BackgroundColor3 = Config.BgColor
-        scanFrame.BackgroundTransparency = 0.1
-        scanFrame.ZIndex = 50
-        scanFrame.Parent = ScreenGui
-        Instance.new("UICorner", scanFrame).CornerRadius = UDim.new(0, 12)
-        
-        local sfTitle = Instance.new("TextLabel")
-        sfTitle.Size = UDim2.new(1, 0, 0, 40)
-        sfTitle.BackgroundTransparency = 1
-        sfTitle.Text = "Remote Scanner 🔍"
-        sfTitle.TextColor3 = Config.TextColor
-        sfTitle.TextSize = 18
-        sfTitle.Font = Enum.Font.GothamBold
-        sfTitle.ZIndex = 51
-        sfTitle.Parent = scanFrame
-        
-        local sfClose = Instance.new("TextButton")
-        sfClose.Size = UDim2.new(0, 30, 0, 30)
-        sfClose.Position = UDim2.new(1, -35, 0, 5)
-        sfClose.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
-        sfClose.Text = "X"
-        sfClose.TextColor3 = Color3.fromRGB(255, 255, 255)
-        sfClose.ZIndex = 51
-        sfClose.Parent = scanFrame
-        Instance.new("UICorner", sfClose).CornerRadius = UDim.new(0, 6)
-        sfClose.MouseButton1Click:Connect(function() scanFrame:Destroy() end)
-        
-        local sfScroll = Instance.new("ScrollingFrame")
-        sfScroll.Size = UDim2.new(1, -20, 1, -50)
-        sfScroll.Position = UDim2.new(0, 10, 0, 45)
-        sfScroll.BackgroundTransparency = 1
-        sfScroll.ZIndex = 51
-        sfScroll.Parent = scanFrame
-        local sfLayout = Instance.new("UIListLayout")
-        sfLayout.Padding = UDim.new(0, 3)
-        sfLayout.Parent = sfScroll
-        
-        local count = 0
-        for _, obj in pairs(ReplicatedStorage:GetDescendants()) do
-            if obj:IsA("RemoteEvent") or obj:IsA("RemoteFunction") then
-                count = count + 1
-                if count <= 100 then
-                    local btn = Instance.new("TextButton")
-                    btn.Size = UDim2.new(1, -10, 0, 30)
-                    btn.BackgroundColor3 = Color3.fromRGB(60, 50, 90)
-                    btn.Text = "📡 " .. obj.Name
-                    btn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                    btn.TextSize = 12
-                    btn.Font = Enum.Font.Gotham
-                    btn.TextXAlignment = Enum.TextXAlignment.Left
-                    btn.ZIndex = 52
-                    btn.Parent = sfScroll
-                    Instance.new("UICorner", btn).CornerRadius = UDim.new(0, 6)
-                    btn.MouseButton1Click:Connect(function()
-                        remoteBox.Text = obj.Name
-                        SendNotification("เลือก", obj.Name, 2)
-                    end)
-                end
-            end
-        end
-        SendNotification("สแกน", "พบ " .. count .. " Remote", 3)
-    end)
-end)
-
--- ==========================================
--- เมนู: ขโมยไข่
--- ==========================================
-CreateSidebarButton("🥚 ขโมยไข่", 4, function()
-    local page = CreatePage("ขโมยไข่")
-    local info = Instance.new("TextLabel")
-    info.Size = UDim2.new(1, 0, 0, 50)
-    info.BackgroundTransparency = 1
-    info.Text = "กดปุ่ม → รอ → วาปไปเก็บไข่ → วาปกลับ"
-    info.TextColor3 = Config.TextDim
-    info.TextSize = 12
-    info.Font = Enum.Font.Gotham
-    info.TextWrapped = true
-    info.ZIndex = 3
-    info.Parent = page
-    
-    local stealBtn = Instance.new("TextButton")
-    stealBtn.Size = UDim2.new(1, 0, 0, 55)
-    stealBtn.BackgroundColor3 = Color3.fromRGB(255, 100, 0)
-    stealBtn.Text = "🥚 ขโมยไข่ (กด)"
-    stealBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    stealBtn.TextSize = 16
-    stealBtn.Font = Enum.Font.GothamBold
-    stealBtn.ZIndex = 6
-    stealBtn.Parent = page
-    Instance.new("UICorner", stealBtn).CornerRadius = UDim.new(0, 10)
-    stealBtn.MouseButton1Click:Connect(function() StealEggOnce() end)
-    
-    CreateSlider(page, "⏱️ เวลารอ", 1, 5, "StealDelay", 1, function(value) Config.StealDelay = value end)
-    CreateSlider(page, "📦 รัศมี", 10, 200, "CollectRadius", 30, function(value) Config.CollectRadius = value end)
-    CreateToggle(page, "🛡️ กันไข่ตก", "AntiDropEnabled", false, function(state)
-        if state then EnableAntiDrop() else DisableAntiDrop() end
-    end)
 end)
 
 -- ==========================================
@@ -1465,40 +1466,34 @@ CreateSidebarButton("👤 ผู้เล่น/บิน", 6, function()
 end)
 
 -- ==========================================
--- ✅ เมนู: เส้นมอง (กลับมาแล้ว!)
+-- เมนู: เส้นมอง
 -- ==========================================
 CreateSidebarButton("👁️ เส้นมอง", 7, function()
     local page = CreatePage("เส้นมอง (ESP)")
-    CreateToggle(page, "เปิด/ปิด เส้นมอง (Tracer)", "ESP_Enabled", false, function(state) end)
-    CreateToggle(page, "เปิด/ปิด กล่องรอบตัว (Box)", "ESP_Box", false, function(state) end)
-    CreateToggle(page, "เปิด/ปิด หลอดเลือด (Health)", "ESP_Health", false, function(state) end)
+    CreateToggle(page, "เปิด/ปิด เส้นมอง", "ESP_Enabled", false, function(state) end)
+    CreateToggle(page, "เปิด/ปิด กล่อง", "ESP_Box", false, function(state) end)
+    CreateToggle(page, "เปิด/ปิด หลอดเลือด", "ESP_Health", false, function(state) end)
     
-    -- ✅ ปุ่มเปลี่ยนตำแหน่งเส้น Top/Bottom
     local modeBtn = Instance.new("TextButton")
     modeBtn.Size = UDim2.new(1, 0, 0, 35)
     modeBtn.BackgroundColor3 = Config.BgColor
     modeBtn.BackgroundTransparency = 0.5
     modeBtn.Text = "📍 ตำแหน่งเส้น: " .. (Config.ESP_LineMode == "Top" and "ด้านบน" or "ด้านล่าง")
     modeBtn.TextColor3 = Config.TextColor
-    modeBtn.TextSize = 14
     modeBtn.Font = Enum.Font.Gotham
     modeBtn.ZIndex = 6
-    modeBtn.Active = true
     modeBtn.Parent = page
     Instance.new("UICorner", modeBtn).CornerRadius = UDim.new(0, 8)
     modeBtn.MouseButton1Click:Connect(function()
         Config.ESP_LineMode = (Config.ESP_LineMode == "Top") and "Bottom" or "Top"
         modeBtn.Text = "📍 ตำแหน่งเส้น: " .. (Config.ESP_LineMode == "Top" and "ด้านบน" or "ด้านล่าง")
-        SendNotification("ESP", "เปลี่ยนเป็น: " .. (Config.ESP_LineMode == "Top" and "ด้านบน" or "ด้านล่าง"), 2)
     end)
     
-    -- ✅ ปุ่มเปลี่ยนสีเส้น
     local colorBtn = Instance.new("TextButton")
     colorBtn.Size = UDim2.new(1, 0, 0, 35)
     colorBtn.BackgroundColor3 = Config.ESP_LineColor
     colorBtn.Text = "🎨 เปลี่ยนสีเส้น ESP"
     colorBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-    colorBtn.TextSize = 14
     colorBtn.Font = Enum.Font.Gotham
     colorBtn.ZIndex = 6
     colorBtn.Parent = page
@@ -1513,54 +1508,6 @@ CreateSidebarButton("👁️ เส้นมอง", 7, function()
         Config.ESP_LineColor = newColor
         colorBtn.BackgroundColor3 = newColor
         if FOVCircle then FOVCircle.Color = newColor end
-        SendNotification("ESP", "เปลี่ยนสีเส้นแล้ว", 2)
-    end)
-    
-    -- Slider ปรับความหนาเส้น
-    local thicknessLabel = Instance.new("TextLabel")
-    thicknessLabel.Size = UDim2.new(1, 0, 0, 20)
-    thicknessLabel.BackgroundTransparency = 1
-    thicknessLabel.Text = "ความหนาเส้น: 1.5"
-    thicknessLabel.TextColor3 = Config.TextDim
-    thicknessLabel.TextSize = 13
-    thicknessLabel.Font = Enum.Font.Gotham
-    thicknessLabel.TextXAlignment = Enum.TextXAlignment.Left
-    thicknessLabel.ZIndex = 3
-    thicknessLabel.Parent = page
-    
-    local thicknessSlider = Instance.new("Frame")
-    thicknessSlider.Size = UDim2.new(1, 0, 0, 15)
-    thicknessSlider.BackgroundColor3 = Color3.fromRGB(40, 35, 60)
-    thicknessSlider.ZIndex = 3
-    thicknessSlider.Parent = page
-    Instance.new("UICorner", thicknessSlider).CornerRadius = UDim.new(1, 0)
-    local thicknessFill = Instance.new("Frame")
-    thicknessFill.Size = UDim2.new(0.3, 0, 1, 0)
-    thicknessFill.BackgroundColor3 = Config.ThemeColor
-    thicknessFill.ZIndex = 4
-    thicknessFill.Parent = thicknessSlider
-    Instance.new("UICorner", thicknessFill).CornerRadius = UDim.new(1, 0)
-    local thicknessBtn = Instance.new("TextButton")
-    thicknessBtn.Size = UDim2.new(1, 0, 1, 0)
-    thicknessBtn.BackgroundTransparency = 1
-    thicknessBtn.Text = ""
-    thicknessBtn.ZIndex = 5
-    thicknessBtn.Parent = thicknessSlider
-    local tDragging = false
-    local function updateThickness()
-        local mouse = UserInputService:GetMouseLocation()
-        local percent = math.clamp((mouse.X - thicknessSlider.AbsolutePosition.X) / thicknessSlider.AbsoluteSize.X, 0, 1)
-        local value = 1 + (percent * 4) -- 1 to 5
-        thicknessFill.Size = UDim2.new(percent, 0, 1, 0)
-        thicknessLabel.Text = "ความหนาเส้น: " .. string.format("%.1f", value)
-        Config.LineThickness = value
-    end
-    thicknessBtn.MouseButton1Down:Connect(function() tDragging = true; updateThickness() end)
-    UserInputService.InputChanged:Connect(function(input)
-        if tDragging and input.UserInputType == Enum.UserInputType.MouseMovement then updateThickness() end
-    end)
-    UserInputService.InputEnded:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then tDragging = false end
     end)
 end)
 
@@ -1569,76 +1516,14 @@ end)
 -- ==========================================
 CreateSidebarButton("⚙️ ตั้งค่า", 8, function()
     local page = CreatePage("ตั้งค่า")
-    local infoLabel = Instance.new("TextLabel")
-    infoLabel.Size = UDim2.new(1, 0, 0, 60)
-    infoLabel.BackgroundTransparency = 1
-    infoLabel.Text = "🐱 แมวส้ม Script Hub v39\nHook: " .. (hasHook and "✅ รองรับ" or "❌ ไม่รองรับ")
-    infoLabel.TextColor3 = Config.TextDim
-    infoLabel.TextSize = 12
-    infoLabel.Font = Enum.Font.Gotham
-    infoLabel.TextWrapped = true
-    infoLabel.TextXAlignment = Enum.TextXAlignment.Left
-    infoLabel.ZIndex = 3
-    infoLabel.Parent = page
-    
-    -- 4K / RTX
-    CreateToggle(page, "🎨 ภาพสวย 4K", "Graphics4KEnabled", false, function(state)
-        if state then
-            pcall(function() settings().Rendering.QualityLevel = Enum.QualityLevel.Level10 end)
-            pcall(function()
-                local cc = Instance.new("ColorCorrectionEffect")
-                cc.Brightness = 0.05; cc.Contrast = 0.25; cc.Saturation = 0.4
-                cc.Parent = Lighting
-                local bloom = Instance.new("BloomEffect")
-                bloom.Intensity = 1.8; bloom.Size = 30
-                bloom.Parent = Lighting
-            end)
-            SendNotification("4K", "เปิดแล้ว!", 2)
-        end
-    end)
-    CreateToggle(page, "🌌 ท้องฟ้า 4K", "Sky4KEnabled", false, function(state)
-        if state then
-            pcall(function()
-                for _, v in pairs(Lighting:GetChildren()) do
-                    if v:IsA("Sky") then v:Destroy() end
-                end
-                local sky = Instance.new("Sky")
-                sky.SkyboxBk = "rbxassetid://159454299"
-                sky.SkyboxDn = "rbxassetid://159454296"
-                sky.SkyboxFt = "rbxassetid://159454293"
-                sky.SkyboxLf = "rbxassetid://159454286"
-                sky.SkyboxRt = "rbxassetid://159454300"
-                sky.SkyboxUp = "rbxassetid://159454288"
-                sky.StarCount = 3000
-                sky.Parent = Lighting
-            end)
-            SendNotification("Sky 4K", "เปิดแล้ว!", 2)
-        end
-    end)
-    CreateToggle(page, "🎬 ภาพ RTX", "RTXEnabled", false, function(state)
-        if state then
-            pcall(function()
-                local cc = Instance.new("ColorCorrectionEffect")
-                cc.Brightness = 0.03; cc.Contrast = 0.35; cc.Saturation = 0.45
-                cc.Parent = Lighting
-                local bloom = Instance.new("BloomEffect")
-                bloom.Intensity = 2.5; bloom.Size = 40
-                bloom.Parent = Lighting
-                local sunRays = Instance.new("SunRaysEffect")
-                sunRays.Intensity = 0.3
-                sunRays.Parent = Lighting
-            end)
-            SendNotification("RTX", "เปิดแล้ว!", 2)
-        end
-    end)
     CreateToggle(page, "⚡ แก้กระตุก", "AntiLagEnabled", false, function(state)
         if state then EnableAntiLag() else DisableAntiLag() end
     end)
-    CreateToggle(page, "💤 AFK", "AFKEnabled", false, function(state)
+    CreateToggle(page, "💤 AFK (กันเตะ)", "AFKEnabled", false, function(state)
         if state then EnableAFK() else DisableAFK() end
     end)
-    CreateToggle(page, "📊 FPS", "FPSEnabled", false, function(state) FPSLabel.Visible = state end)
-    CreateToggle(page, "🌈 FPS RGB", "FPSRGB", false, function(state) end)
+    CreateToggle(page, "📊 แสดง FPS", "FPSEnabled", false, function(state) FPSLabel.Visible = state end)
+    CreateToggle(page, "🌈 FPS สี RGB", "FPSRGB", false, function(state) end)
     
     CreateButton(page, "🔍 หาเซิร์ฟเวอร์ว่าง", function()
         SendNotification("Server Finder", "กำลังค้นหา...", 2)
@@ -1828,7 +1713,7 @@ RunService.RenderStepped:Connect(function()
                             data.Line.From = originPoint
                             data.Line.To = Vector2.new(screenPoint.X, screenPoint.Y)
                             data.Line.Color = Config.ESP_LineColor
-                            data.Line.Thickness = Config.LineThickness or 1.5
+                            data.Line.Thickness = Config.LineThickness
                             data.Line.Visible = true
                             data.Text.Text = player.Name
                             data.Text.Position = Vector2.new(screenPoint.X, screenPoint.Y - 25)
@@ -1848,7 +1733,7 @@ RunService.RenderStepped:Connect(function()
                                 data.Box.Size = Vector2.new(width, height)
                                 data.Box.Position = boxPos
                                 data.Box.Color = Config.ESP_LineColor
-                                data.Box.Thickness = Config.LineThickness or 1.5
+                                data.Box.Thickness = Config.LineThickness
                                 data.Box.Visible = true
                                 if Config.ESP_Health then
                                     local humanoid = char.Humanoid
@@ -1898,5 +1783,5 @@ task.spawn(function()
     if LoadingGui then LoadingGui:Destroy() end
     if ToggleButton then ToggleButton.Visible = true end
     if MainFrame then MainFrame.Visible = true end
-    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v39 พร้อมใช้!", 3)
+    SendNotification("ยินดีต้อนรับ", "🐱 แมวส้ม Script Hub v40 พร้อมใช้!", 3)
 end)
