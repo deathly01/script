@@ -1,0 +1,1796 @@
+--==================================================
+-- ⚡ ส่วนกระตุกสั้นๆ + หน่วงเวลา 5 วินาทีก่อนโหลด
+--==================================================
+local lagStart = os.clock()
+while os.clock() - lagStart < 0.8 do
+	for i = 1, 1000000 do
+		local _ = math.sqrt(i) * math.sin(i)
+	end
+end
+task.wait(5)
+
+--==================================================
+-- // 759 - Full LocalScript (Part 1)
+-- // Roblox Studio > StarterPlayer > StarterPlayerScripts
+--==================================================
+
+local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
+local Workspace = game:GetService("Workspace")
+local MarketplaceService = game:GetService("MarketplaceService")
+local GuiService = game:GetService("GuiService")
+
+local player = Players.LocalPlayer
+local Camera = Workspace.CurrentCamera
+
+--==================================================
+-- 🎨 ตั้งค่ารูปภาพ (แก้ตรงนี้ถ้าต้องการ)
+--==================================================
+local LoadingImageId  = "rbxassetid://0"   -- รูปหน้าโหลด
+local MenuLogoId      = "rbxassetid://0"   -- รูปโลโก้ในเมนู
+local LoadingDuration = 4                  -- ระยะเวลาโหลด (วินาที)
+local LoadingTitle    = "759 HUB"
+local LoadingSubtitle = "กำลังโหลด..."
+
+--==================================================
+-- ระบบตรวจจับเวลา & อุปกรณ์
+--==================================================
+local scriptStartClock = os.clock()
+local scriptStartTimestamp = os.date("%H:%M:%S")
+
+local function GetDeviceType()
+	if GuiService:IsTenFootInterface() then
+		return "Console"
+	elseif UserInputService.TouchEnabled and not UserInputService.KeyboardEnabled then
+		return "iOS / Android"
+	elseif UserInputService.KeyboardEnabled and UserInputService.MouseEnabled then
+		return "PC"
+	end
+	return "PC / Mobile"
+end
+
+local function FormatTime(seconds)
+	local hrs = math.floor(seconds / 3600)
+	local mins = math.floor((seconds % 3600) / 60)
+	local secs = math.floor(seconds % 60)
+	return string.format("%02d:%02d:%02d", hrs, mins, secs)
+end
+
+--==================================================
+-- ⏳ LOADING SCREEN
+--==================================================
+
+local loadingGui = Instance.new("ScreenGui")
+loadingGui.Name = "759_LoadingScreen"
+loadingGui.ResetOnSpawn = false
+loadingGui.IgnoreGuiInset = true
+loadingGui.DisplayOrder = 999
+loadingGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+loadingGui.Parent = player:WaitForChild("PlayerGui")
+
+local loadBG = Instance.new("Frame")
+loadBG.Name = "BG"
+loadBG.Size = UDim2.new(1, 0, 1, 0)
+loadBG.BackgroundColor3 = Color3.fromRGB(8, 8, 12)
+loadBG.BorderSizePixel = 0
+loadBG.Parent = loadingGui
+
+if LoadingImageId ~= "rbxassetid://0" and LoadingImageId ~= "" then
+	local loadImg = Instance.new("ImageLabel")
+	loadImg.Name = "LoadingImage"
+	loadImg.Size = UDim2.new(1, 0, 1, 0)
+	loadImg.BackgroundTransparency = 1
+	loadImg.Image = LoadingImageId
+	loadImg.ScaleType = Enum.ScaleType.Crop
+	loadImg.ImageTransparency = 0.35
+	loadImg.Parent = loadBG
+
+	local darkOverlay = Instance.new("Frame")
+	darkOverlay.Size = UDim2.new(1, 0, 1, 0)
+	darkOverlay.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
+	darkOverlay.BackgroundTransparency = 0.55
+	darkOverlay.BorderSizePixel = 0
+	darkOverlay.Parent = loadBG
+end
+
+local logoLabel = Instance.new("TextLabel")
+logoLabel.Name = "Title"
+logoLabel.Size = UDim2.new(1, 0, 0, 60)
+logoLabel.Position = UDim2.new(0, 0, 0.5, -80)
+logoLabel.BackgroundTransparency = 1
+logoLabel.Text = LoadingTitle
+logoLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+logoLabel.TextSize = 48
+logoLabel.Font = Enum.Font.GothamBlack
+logoLabel.Parent = loadBG
+
+local logoStroke = Instance.new("UIStroke")
+logoStroke.Color = Color3.fromRGB(0, 255, 136)
+logoStroke.Thickness = 2
+logoStroke.Transparency = 0.3
+logoStroke.Parent = logoLabel
+
+local subLabel = Instance.new("TextLabel")
+subLabel.Name = "Subtitle"
+subLabel.Size = UDim2.new(1, 0, 0, 24)
+subLabel.Position = UDim2.new(0, 0, 0.5, -18)
+subLabel.BackgroundTransparency = 1
+subLabel.Text = LoadingSubtitle
+subLabel.TextColor3 = Color3.fromRGB(180, 180, 200)
+subLabel.TextSize = 15
+subLabel.Font = Enum.Font.Gotham
+subLabel.Parent = loadBG
+
+local barBG = Instance.new("Frame")
+barBG.Name = "BarBG"
+barBG.Size = UDim2.new(0, 380, 0, 8)
+barBG.Position = UDim2.new(0.5, -190, 0.5, 40)
+barBG.BackgroundColor3 = Color3.fromRGB(30, 30, 40)
+barBG.BorderSizePixel = 0
+barBG.Parent = loadBG
+
+local barBGCorner = Instance.new("UICorner")
+barBGCorner.CornerRadius = UDim.new(1, 0)
+barBGCorner.Parent = barBG
+
+local barFill = Instance.new("Frame")
+barFill.Name = "BarFill"
+barFill.Size = UDim2.new(0, 0, 1, 0)
+barFill.BackgroundColor3 = Color3.fromRGB(0, 255, 136)
+barFill.BorderSizePixel = 0
+barFill.Parent = barBG
+
+local barFillCorner = Instance.new("UICorner")
+barFillCorner.CornerRadius = UDim.new(1, 0)
+barFillCorner.Parent = barFill
+
+local percentLabel = Instance.new("TextLabel")
+percentLabel.Name = "Percent"
+percentLabel.Size = UDim2.new(0, 380, 0, 20)
+percentLabel.Position = UDim2.new(0.5, -190, 0.5, 55)
+percentLabel.BackgroundTransparency = 1
+percentLabel.Text = "0%"
+percentLabel.TextColor3 = Color3.fromRGB(0, 255, 136)
+percentLabel.TextSize = 13
+percentLabel.Font = Enum.Font.GothamBold
+percentLabel.Parent = loadBG
+
+local loadStart = os.clock()
+local loadDone = false
+
+task.spawn(function()
+	while not loadDone do
+		local elapsed = os.clock() - loadStart
+		local pct = math.clamp(elapsed / LoadingDuration, 0, 1)
+		barFill.Size = UDim2.new(pct, 0, 1, 0)
+		percentLabel.Text = math.floor(pct * 100) .. "%"
+		if pct >= 1 then break end
+		task.wait(0.03)
+	end
+	loadDone = true
+	percentLabel.Text = "100%"
+	subLabel.Text = "เสร็จสิ้น! กำลังเข้าสู่เมนู..."
+	task.wait(0.6)
+
+	TweenService:Create(loadBG, TweenInfo.new(0.6, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(logoLabel, TweenInfo.new(0.6), {TextTransparency = 1}):Play()
+	TweenService:Create(subLabel, TweenInfo.new(0.6), {TextTransparency = 1}):Play()
+	TweenService:Create(barBG, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(barFill, TweenInfo.new(0.5), {BackgroundTransparency = 1}):Play()
+	TweenService:Create(percentLabel, TweenInfo.new(0.5), {TextTransparency = 1}):Play()
+	task.wait(0.7)
+	loadingGui:Destroy()
+end)
+
+while not loadDone do task.wait(0.1) end
+
+--==================================================
+-- ตัวแปรระบบ
+--==================================================
+local ESPEnabled = false
+local LineColor = Color3.fromRGB(255, 255, 255)
+local espObjects = {}
+local currentLang = "TH"
+
+local SpeedEnabled = false
+local WalkSpeedValue = 50
+local FlyEnabled = false
+local FlySpeedValue = 50
+local flyBodyVel, flyBodyGyro
+
+local GodModeEnabled = false
+local InvisEnabled = false
+
+local selectedTpPlayer = nil
+local selectedCopySkinPlayer = nil
+
+--==================================================
+-- คลังข้อมูลภาษา
+--==================================================
+local Translations = {
+	TH = {
+		SubTitle = "โดยสร้าง759", Search = "10.67",
+		LangTitle = "🌐 เลือกภาษา (Language)", StatusTitle = "👤 สถานะผู้เล่น",
+		HealthText = "พลังชีวิต:", DeviceText = "💻 อุปกรณ์:",
+		ScriptTimeText = "⏱️ เวลาเริ่มสคริปต์:", PlayTimeText = "⏳ เวลาที่เล่นสะสม:",
+		GameInfoTitle = "🎮 เกมที่กำลังเล่นอยู่", GameNameText = "ชื่อเกม:",
+		PlaceIdText = "Place ID:", SpeedTitle = "⚡ สปีดการวิ่ง",
+		FlyTitle = "🕊 ระบบบิน (Fly)", TeleportTitle = "🌀 วาร์ปไปหาผู้เล่น (Teleport)",
+		CopySkinTitle = "👕 ถามพ่อมึงดู (Copy Skin)", GodModeTitle = "🛡️ เลือดไม่ลด (อมตะ)",
+		InvisTitle = "👻 หายตัว (Invisible)", ConfirmText = "ตกลง", ValText = "ความเร็ว: ",
+		Tabs = { ["MAIN TAB"]="หน้าหลัก", ["COMBAT"]="มอง", ["MISC"]="ทั่วไป",
+			["ISLANDS"]="ปิดอัปเดตอ่านด้วย", ["ANTI BUDDHA"]="ปิดอัปเดตอ่านด้วย",
+			["MAIN CONTROL"]="ควบคุมหลัก" },
+		ESPLabel = "👁️ ระบบ ESP (กล่อง + เส้น)"
+	},
+	EN = {
+		SubTitle = "By 759", Search = "SEARCH",
+		LangTitle = "🌐 Language Select", StatusTitle = "👤 Player Status",
+		HealthText = "Health:", DeviceText = "💻 Device:",
+		ScriptTimeText = "⏱️ Executed At:", PlayTimeText = "⏳ Play Time:",
+		GameInfoTitle = "🎮 Current Playing Game", GameNameText = "Game Name:",
+		PlaceIdText = "Place ID:", SpeedTitle = "⚡ WalkSpeed",
+		FlyTitle = "🕊️ Fly Hack", TeleportTitle = "🌀 Teleport to Player",
+		CopySkinTitle = "👕 Copy Player Skin", GodModeTitle = "🛡️ God Mode",
+		InvisTitle = "👻 Invisibility", ConfirmText = "CONFIRM", ValText = "Speed: ",
+		Tabs = { ["MAIN TAB"]="MAIN TAB", ["COMBAT"]="ESP / VISUALS", ["MISC"]="MISC",
+			["ISLANDS"]="ISLANDS", ["ANTI BUDDHA"]="ANTI BUDDHA", ["MAIN CONTROL"]="MAIN CONTROL" },
+		ESPLabel = "👁 ESP System (Box + Tracer)"
+	},
+	VN = {
+		SubTitle = "Bởi 759", Search = "TÌM KIẾM",
+		LangTitle = "🌐 Chọn Ngôn Ngữ", StatusTitle = "👤 Trạng Thái Người Chơi",
+		HealthText = "Máu:", DeviceText = "💻 Thiết bị:",
+		ScriptTimeText = "⏱️ Thời gian bật Script:", PlayTimeText = "⏳ Thời gian chơi:",
+		GameInfoTitle = "🎮 Trò Chơi Đang Chơi", GameNameText = "Tên trò chơi:",
+		PlaceIdText = "Place ID:", SpeedTitle = "⚡ Tốc Độ Chạy",
+		FlyTitle = "🕊️ Chế Độ Bay", TeleportTitle = "🌀 Dịch Chuyển",
+		CopySkinTitle = "👕 Sao Chép Trang Phục", GodModeTitle = "🛡️ Bất Tử",
+		InvisTitle = "👻 Tàng Hình", ConfirmText = "XÁC NHẬN", ValText = "Tốc độ: ",
+		Tabs = { ["MAIN TAB"]="TRANG CHÍNH", ["COMBAT"]="X-RAY", ["MISC"]="LINH TINH",
+			["ISLANDS"]="CÁC ĐẢO", ["ANTI BUDDHA"]="CHỐNG PHẬT", ["MAIN CONTROL"]="ĐIỀU KHIỂN CHÍNH" },
+		ESPLabel = "👁️ Hệ thống ESP"
+	},
+	ID = {
+		SubTitle = "Oleh 759", Search = "CARI",
+		LangTitle = "🌐 Pilih Bahasa", StatusTitle = "👤 Status Pemain",
+		HealthText = "Darah:", DeviceText = "💻 Perangkat:",
+		ScriptTimeText = "⏱️ Waktu Jalankan:", PlayTimeText = "⏳ Waktu Bermain:",
+		GameInfoTitle = "🎮 Game Yang Dimainkan", GameNameText = "Nama Game:",
+		PlaceIdText = "Place ID:", SpeedTitle = "⚡ Kecepatan Lari",
+		FlyTitle = "🕊️ Mode Terbang", TeleportTitle = "🌀 Teleport",
+		CopySkinTitle = "👕 Salin Skin", GodModeTitle = "🛡️ Mode Kebal",
+		InvisTitle = "👻 Mode Transparan", ConfirmText = "KONFIRMASI", ValText = "Kecepatan: ",
+		Tabs = { ["MAIN TAB"]="UTAMA", ["COMBAT"]="PENGLIHATAN", ["MISC"]="LAIN-LAIN",
+			["ISLANDS"]="PULAU", ["ANTI BUDDHA"]="ANTI BUDDHA", ["MAIN CONTROL"]="KONTROL UTAMA" },
+		ESPLabel = "👁️ Sistem ESP"
+	}
+}
+
+--==================================================
+-- ScreenGui
+--==================================================
+local gui = Instance.new("ScreenGui")
+gui.Name = "759HubGui"
+gui.ResetOnSpawn = false
+gui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
+gui.IgnoreGuiInset = true
+gui.Parent = player:WaitForChild("PlayerGui")
+
+local espFolder = Instance.new("Folder")
+espFolder.Name = "ESP_Container"
+espFolder.Parent = gui
+--==================================================
+-- ปุ่มลอย 759
+--==================================================
+local floatBtn = Instance.new("TextButton")
+floatBtn.Name = "Float759Button"
+floatBtn.Size = UDim2.fromOffset(80, 48)
+floatBtn.Position = UDim2.fromOffset(20, 200)
+floatBtn.BackgroundColor3 = Color3.fromRGB(18, 18, 22)
+floatBtn.Text = "759"
+floatBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+floatBtn.TextSize = 22
+floatBtn.Font = Enum.Font.GothamBold
+floatBtn.AutoButtonColor = false
+floatBtn.Parent = gui
+
+local floatCorner = Instance.new("UICorner")
+floatCorner.CornerRadius = UDim.new(0, 10)
+floatCorner.Parent = floatBtn
+
+local floatStroke = Instance.new("UIStroke")
+floatStroke.Color = Color3.fromRGB(50, 50, 60)
+floatStroke.Thickness = 1
+floatStroke.Parent = floatBtn
+
+--==================================================
+-- กรอบเมนูหลัก
+--==================================================
+local mainFrame = Instance.new("Frame")
+mainFrame.Name = "MainFrame"
+mainFrame.Size = UDim2.fromOffset(580, 360)
+mainFrame.Position = UDim2.new(0.5, -290, 0.5, -180)
+mainFrame.BackgroundColor3 = Color3.fromRGB(12, 12, 15)
+mainFrame.BorderSizePixel = 0
+mainFrame.Visible = false
+mainFrame.Parent = gui
+
+local mainCorner = Instance.new("UICorner")
+mainCorner.CornerRadius = UDim.new(0, 14)
+mainCorner.Parent = mainFrame
+
+local mainStroke = Instance.new("UIStroke")
+mainStroke.Color = Color3.fromRGB(35, 35, 42)
+mainStroke.Thickness = 1
+mainStroke.Parent = mainFrame
+
+local mainScale = Instance.new("UIScale")
+mainScale.Scale = 0.75
+mainScale.Parent = mainFrame
+
+--==================================================
+-- Header
+--==================================================
+local headerBar = Instance.new("Frame")
+headerBar.Name = "HeaderBar"
+headerBar.Size = UDim2.new(1, 0, 0, 55)
+headerBar.BackgroundTransparency = 1
+headerBar.Parent = mainFrame
+
+if MenuLogoId ~= "rbxassetid://0" and MenuLogoId ~= "" then
+	local logoImg = Instance.new("ImageLabel")
+	logoImg.Name = "MenuLogo"
+	logoImg.Size = UDim2.fromOffset(36, 36)
+	logoImg.Position = UDim2.fromOffset(20, 10)
+	logoImg.BackgroundTransparency = 1
+	logoImg.Image = MenuLogoId
+	logoImg.Parent = headerBar
+
+	local logoImgCorner = Instance.new("UICorner")
+	logoImgCorner.CornerRadius = UDim.new(0, 6)
+	logoImgCorner.Parent = logoImg
+end
+
+local hubTitle = Instance.new("TextLabel")
+hubTitle.Name = "HubTitle"
+hubTitle.Size = UDim2.fromOffset(200, 26)
+if MenuLogoId ~= "rbxassetid://0" and MenuLogoId ~= "" then
+	hubTitle.Position = UDim2.fromOffset(64, 10)
+else
+	hubTitle.Position = UDim2.fromOffset(20, 10)
+end
+hubTitle.BackgroundTransparency = 1
+hubTitle.Text = "759"
+hubTitle.TextColor3 = Color3.fromRGB(255, 255, 255)
+hubTitle.TextSize = 22
+hubTitle.Font = Enum.Font.GothamBold
+hubTitle.TextXAlignment = Enum.TextXAlignment.Left
+hubTitle.Parent = headerBar
+
+local hubSubTitle = Instance.new("TextLabel")
+hubSubTitle.Name = "HubSubTitle"
+hubSubTitle.Size = UDim2.fromOffset(200, 18)
+hubSubTitle.Position = UDim2.fromOffset(20, 32)
+hubSubTitle.BackgroundTransparency = 1
+hubSubTitle.Text = Translations.TH.SubTitle
+hubSubTitle.TextColor3 = Color3.fromRGB(140, 140, 150)
+hubSubTitle.TextSize = 12
+hubSubTitle.Font = Enum.Font.Gotham
+hubSubTitle.TextXAlignment = Enum.TextXAlignment.Left
+hubSubTitle.Parent = headerBar
+
+local searchLabel = Instance.new("TextLabel")
+searchLabel.Name = "SearchLabel"
+searchLabel.Size = UDim2.fromOffset(70, 25)
+searchLabel.Position = UDim2.new(1, -150, 0, 15)
+searchLabel.BackgroundTransparency = 1
+searchLabel.Text = Translations.TH.Search
+searchLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+searchLabel.TextSize = 13
+searchLabel.Font = Enum.Font.GothamBold
+searchLabel.Parent = headerBar
+
+local minimizeBtn = Instance.new("TextButton")
+minimizeBtn.Name = "MinimizeBtn"
+minimizeBtn.Size = UDim2.fromOffset(25, 25)
+minimizeBtn.Position = UDim2.new(1, -70, 0, 15)
+minimizeBtn.BackgroundTransparency = 1
+minimizeBtn.Text = "-"
+minimizeBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+minimizeBtn.TextSize = 20
+minimizeBtn.Font = Enum.Font.GothamBold
+minimizeBtn.Parent = headerBar
+
+local closeBtn = Instance.new("TextButton")
+closeBtn.Name = "CloseBtn"
+closeBtn.Size = UDim2.fromOffset(25, 25)
+closeBtn.Position = UDim2.new(1, -40, 0, 15)
+closeBtn.BackgroundTransparency = 1
+closeBtn.Text = "X"
+closeBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+closeBtn.TextSize = 16
+closeBtn.Font = Enum.Font.GothamBold
+closeBtn.Parent = headerBar
+
+--==================================================
+-- Sidebar
+--==================================================
+local sidebar = Instance.new("Frame")
+sidebar.Name = "Sidebar"
+sidebar.Size = UDim2.new(0, 150, 1, -65)
+sidebar.Position = UDim2.fromOffset(15, 55)
+sidebar.BackgroundTransparency = 1
+sidebar.Parent = mainFrame
+
+local sidebarList = Instance.new("UIListLayout")
+sidebarList.SortOrder = Enum.SortOrder.LayoutOrder
+sidebarList.Padding = UDim.new(0, 8)
+sidebarList.Parent = sidebar
+
+local lineSeparator = Instance.new("Frame")
+lineSeparator.Name = "Separator"
+lineSeparator.Size = UDim2.new(0, 1, 1, -65)
+lineSeparator.Position = UDim2.fromOffset(170, 55)
+lineSeparator.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+lineSeparator.BorderSizePixel = 0
+lineSeparator.Parent = mainFrame
+
+local contentContainer = Instance.new("Frame")
+contentContainer.Name = "ContentContainer"
+contentContainer.Size = UDim2.new(1, -195, 1, -70)
+contentContainer.Position = UDim2.fromOffset(180, 60)
+contentContainer.BackgroundTransparency = 1
+contentContainer.Parent = mainFrame
+
+--==================================================
+-- Tabs & Pages
+--==================================================
+local rawTabs = {"MAIN TAB", "COMBAT", "MISC", "ISLANDS", "ANTI BUDDHA", "MAIN CONTROL"}
+local tabButtons = {}
+local tabPages = {}
+
+for index, keyName in ipairs(rawTabs) do
+	local btn = Instance.new("TextButton")
+	btn.Name = keyName .. "_Btn"
+	btn.Size = UDim2.new(1, 0, 0, 32)
+	btn.BackgroundTransparency = 1
+	btn.Text = Translations.TH.Tabs[keyName]
+	btn.TextColor3 = (index == 1) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(120, 120, 135)
+	btn.TextSize = 13
+	btn.Font = Enum.Font.GothamBold
+	btn.TextXAlignment = Enum.TextXAlignment.Left
+	btn.LayoutOrder = index
+	btn.Parent = sidebar
+	tabButtons[keyName] = btn
+
+	local page = Instance.new("ScrollingFrame")
+	page.Name = keyName .. "_Page"
+	page.Size = UDim2.new(1, 0, 1, 0)
+	page.BackgroundTransparency = 1
+	page.BorderSizePixel = 0
+	page.ScrollBarThickness = 3
+	page.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 75)
+	page.Visible = (index == 1)
+	page.Parent = contentContainer
+
+	local pageList = Instance.new("UIListLayout")
+	pageList.SortOrder = Enum.SortOrder.LayoutOrder
+	pageList.Padding = UDim.new(0, 10)
+	pageList.Parent = page
+	pageList:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+		page.CanvasSize = UDim2.fromOffset(0, pageList.AbsoluteContentSize.Y + 15)
+	end)
+	tabPages[keyName] = page
+
+	btn.Activated:Connect(function()
+		for name, pageFrame in pairs(tabPages) do
+			pageFrame.Visible = (name == keyName)
+		end
+		for name, buttonObj in pairs(tabButtons) do
+			buttonObj.TextColor3 = (name == keyName) and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(120, 120, 135)
+		end
+	end)
+end
+
+--==================================================
+-- MAIN TAB
+--==================================================
+local mainPage = tabPages["MAIN TAB"]
+
+local profileBox = Instance.new("Frame")
+profileBox.Name = "ProfileBox"
+profileBox.Size = UDim2.new(1, -10, 0, 95)
+profileBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+profileBox.BorderSizePixel = 0
+profileBox.LayoutOrder = 1
+profileBox.Parent = mainPage
+
+local profileCorner = Instance.new("UICorner")
+profileCorner.CornerRadius = UDim.new(0, 10)
+profileCorner.Parent = profileBox
+
+local avatarImg = Instance.new("ImageLabel")
+avatarImg.Name = "AvatarImg"
+avatarImg.Size = UDim2.fromOffset(60, 60)
+avatarImg.Position = UDim2.fromOffset(15, 17.5)
+avatarImg.BackgroundColor3 = Color3.fromRGB(30, 30, 38)
+avatarImg.Image = "rbxthumb://type=AvatarHeadShot&id=" .. player.UserId .. "&w=150&h=150"
+avatarImg.Parent = profileBox
+
+local avatarCorner = Instance.new("UICorner")
+avatarCorner.CornerRadius = UDim.new(1, 0)
+avatarCorner.Parent = avatarImg
+
+local avatarStroke = Instance.new("UIStroke")
+avatarStroke.Color = Color3.fromRGB(46, 204, 113)
+avatarStroke.Thickness = 2
+avatarStroke.Parent = avatarImg
+
+local nameLabel = Instance.new("TextLabel")
+nameLabel.Name = "NameLabel"
+nameLabel.Size = UDim2.new(1, -90, 0, 20)
+nameLabel.Position = UDim2.fromOffset(85, 18)
+nameLabel.BackgroundTransparency = 1
+nameLabel.Text = player.DisplayName .. " (@" .. player.Name .. ")"
+nameLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+nameLabel.TextSize = 13
+nameLabel.Font = Enum.Font.GothamBold
+nameLabel.TextXAlignment = Enum.TextXAlignment.Left
+nameLabel.Parent = profileBox
+
+local healthTextLabel = Instance.new("TextLabel")
+healthTextLabel.Name = "HealthTextLabel"
+healthTextLabel.Size = UDim2.new(1, -90, 0, 16)
+healthTextLabel.Position = UDim2.fromOffset(85, 40)
+healthTextLabel.BackgroundTransparency = 1
+healthTextLabel.Text = Translations.TH.HealthText .. " 100 / 100"
+healthTextLabel.TextColor3 = Color3.fromRGB(180, 180, 190)
+healthTextLabel.TextSize = 11
+healthTextLabel.Font = Enum.Font.Gotham
+healthTextLabel.TextXAlignment = Enum.TextXAlignment.Left
+healthTextLabel.Parent = profileBox
+
+local healthBarBG = Instance.new("Frame")
+healthBarBG.Name = "HealthBarBG"
+healthBarBG.Size = UDim2.new(1, -100, 0, 7)
+healthBarBG.Position = UDim2.fromOffset(85, 60)
+healthBarBG.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+healthBarBG.BorderSizePixel = 0
+healthBarBG.Parent = profileBox
+
+local healthBarBGCorner = Instance.new("UICorner")
+healthBarBGCorner.CornerRadius = UDim.new(1, 0)
+healthBarBGCorner.Parent = healthBarBG
+
+local healthBarFill = Instance.new("Frame")
+healthBarFill.Name = "HealthBarFill"
+healthBarFill.Size = UDim2.new(1, 0, 1, 0)
+healthBarFill.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+healthBarFill.BorderSizePixel = 0
+healthBarFill.Parent = healthBarBG
+
+local healthBarFillCorner = Instance.new("UICorner")
+healthBarFillCorner.CornerRadius = UDim.new(1, 0)
+healthBarFillCorner.Parent = healthBarFill
+
+local infoBox = Instance.new("Frame")
+infoBox.Name = "InfoBox"
+infoBox.Size = UDim2.new(1, -10, 0, 85)
+infoBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+infoBox.BorderSizePixel = 0
+infoBox.LayoutOrder = 2
+infoBox.Parent = mainPage
+
+local infoCorner = Instance.new("UICorner")
+infoCorner.CornerRadius = UDim.new(0, 10)
+infoCorner.Parent = infoBox
+
+local deviceLabel = Instance.new("TextLabel")
+deviceLabel.Name = "DeviceLabel"
+deviceLabel.Size = UDim2.new(1, -20, 0, 20)
+deviceLabel.Position = UDim2.fromOffset(15, 10)
+deviceLabel.BackgroundTransparency = 1
+deviceLabel.Text = Translations.TH.DeviceText .. " " .. GetDeviceType()
+deviceLabel.TextColor3 = Color3.fromRGB(230, 230, 240)
+deviceLabel.TextSize = 12
+deviceLabel.Font = Enum.Font.GothamBold
+deviceLabel.TextXAlignment = Enum.TextXAlignment.Left
+deviceLabel.Parent = infoBox
+
+local scriptTimeLabel = Instance.new("TextLabel")
+scriptTimeLabel.Name = "ScriptTimeLabel"
+scriptTimeLabel.Size = UDim2.new(1, -20, 0, 20)
+scriptTimeLabel.Position = UDim2.fromOffset(15, 32)
+scriptTimeLabel.BackgroundTransparency = 0.85
+scriptTimeLabel.BackgroundColor3 = Color3.fromRGB(40, 15, 15)
+scriptTimeLabel.Text = Translations.TH.ScriptTimeText .. " " .. scriptStartTimestamp
+scriptTimeLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+scriptTimeLabel.TextSize = 12
+scriptTimeLabel.Font = Enum.Font.GothamBold
+scriptTimeLabel.TextXAlignment = Enum.TextXAlignment.Left
+scriptTimeLabel.Parent = infoBox
+
+local scriptTimeCorner = Instance.new("UICorner")
+scriptTimeCorner.CornerRadius = UDim.new(0, 4)
+scriptTimeCorner.Parent = scriptTimeLabel
+
+local scriptTimeStroke = Instance.new("UIStroke")
+scriptTimeStroke.Color = Color3.fromRGB(231, 76, 60)
+scriptTimeStroke.Thickness = 1.5
+scriptTimeStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+scriptTimeStroke.Parent = scriptTimeLabel
+
+local playTimeLabel = Instance.new("TextLabel")
+playTimeLabel.Name = "PlayTimeLabel"
+playTimeLabel.Size = UDim2.new(1, -20, 0, 20)
+playTimeLabel.Position = UDim2.fromOffset(15, 54)
+playTimeLabel.BackgroundTransparency = 1
+playTimeLabel.Text = Translations.TH.PlayTimeText .. " 00:00:00"
+playTimeLabel.TextColor3 = Color3.fromRGB(46, 204, 113)
+playTimeLabel.TextSize = 12
+playTimeLabel.Font = Enum.Font.GothamBold
+playTimeLabel.TextXAlignment = Enum.TextXAlignment.Left
+playTimeLabel.Parent = infoBox
+
+local gameBox = Instance.new("Frame")
+gameBox.Name = "GameBox"
+gameBox.Size = UDim2.new(1, -10, 0, 90)
+gameBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+gameBox.BorderSizePixel = 0
+gameBox.LayoutOrder = 3
+gameBox.Parent = mainPage
+
+local gameCorner = Instance.new("UICorner")
+gameCorner.CornerRadius = UDim.new(0, 10)
+gameCorner.Parent = gameBox
+
+local gameTitleLabel = Instance.new("TextLabel")
+gameTitleLabel.Name = "GameTitleLabel"
+gameTitleLabel.Size = UDim2.new(1, -20, 0, 22)
+gameTitleLabel.Position = UDim2.fromOffset(15, 8)
+gameTitleLabel.BackgroundTransparency = 1
+gameTitleLabel.Text = Translations.TH.GameInfoTitle
+gameTitleLabel.TextColor3 = Color3.fromRGB(255, 255, 255)
+gameTitleLabel.TextSize = 13
+gameTitleLabel.Font = Enum.Font.GothamBold
+gameTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+gameTitleLabel.Parent = gameBox
+
+local gameNameLabel = Instance.new("TextLabel")
+gameNameLabel.Name = "GameNameLabel"
+gameNameLabel.Size = UDim2.new(1, -20, 0, 20)
+gameNameLabel.Position = UDim2.fromOffset(15, 34)
+gameNameLabel.BackgroundTransparency = 1
+gameNameLabel.Text = Translations.TH.GameNameText .. " กำลังโหลด..."
+gameNameLabel.TextColor3 = Color3.fromRGB(200, 200, 210)
+gameNameLabel.TextSize = 12
+gameNameLabel.Font = Enum.Font.Gotham
+gameNameLabel.TextXAlignment = Enum.TextXAlignment.Left
+gameNameLabel.Parent = gameBox
+
+local placeIdLabel = Instance.new("TextLabel")
+placeIdLabel.Name = "PlaceIdLabel"
+placeIdLabel.Size = UDim2.new(1, -20, 0, 20)
+placeIdLabel.Position = UDim2.fromOffset(15, 56)
+placeIdLabel.BackgroundTransparency = 1
+placeIdLabel.Text = Translations.TH.PlaceIdText .. " " .. game.PlaceId
+placeIdLabel.TextColor3 = Color3.fromRGB(150, 150, 165)
+placeIdLabel.TextSize = 11
+placeIdLabel.Font = Enum.Font.Gotham
+placeIdLabel.TextXAlignment = Enum.TextXAlignment.Left
+placeIdLabel.Parent = gameBox
+
+task.spawn(function()
+	local success, result = pcall(function()
+		return MarketplaceService:GetProductInfo(game.PlaceId).Name
+	end)
+	local langData = Translations[currentLang] or Translations.TH
+	if success and result then
+		gameNameLabel.Text = langData.GameNameText .. " " .. result
+	else
+		gameNameLabel.Text = langData.GameNameText .. " " .. tostring(game.PlaceId)
+	end
+end)
+
+--==================================================
+-- MISC TAB
+--==================================================
+local miscPage = tabPages["MISC"]
+
+-- Speed
+local speedBox = Instance.new("Frame")
+speedBox.Name = "SpeedBox"
+speedBox.Size = UDim2.new(1, -10, 0, 45)
+speedBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+speedBox.BorderSizePixel = 0
+speedBox.ClipsDescendants = true
+speedBox.LayoutOrder = 1
+speedBox.Parent = miscPage
+
+local speedCorner = Instance.new("UICorner")
+speedCorner.CornerRadius = UDim.new(0, 8)
+speedCorner.Parent = speedBox
+
+local speedTitleLabel = Instance.new("TextLabel")
+speedTitleLabel.Name = "SpeedTitleLabel"
+speedTitleLabel.Size = UDim2.new(1, -120, 0, 45)
+speedTitleLabel.Position = UDim2.fromOffset(15, 0)
+speedTitleLabel.BackgroundTransparency = 1
+speedTitleLabel.Text = Translations.TH.SpeedTitle
+speedTitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+speedTitleLabel.TextSize = 13
+speedTitleLabel.Font = Enum.Font.GothamBold
+speedTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+speedTitleLabel.Parent = speedBox
+
+local speedArrowBtn = Instance.new("TextButton")
+speedArrowBtn.Name = "SpeedArrowBtn"
+speedArrowBtn.Size = UDim2.fromOffset(30, 30)
+speedArrowBtn.Position = UDim2.new(1, -95, 0, 7.5)
+speedArrowBtn.BackgroundTransparency = 1
+speedArrowBtn.Text = "▼"
+speedArrowBtn.TextColor3 = Color3.fromRGB(180, 180, 200)
+speedArrowBtn.TextSize = 14
+speedArrowBtn.Font = Enum.Font.GothamBold
+speedArrowBtn.Parent = speedBox
+
+local speedSwitchBG = Instance.new("TextButton")
+speedSwitchBG.Name = "SpeedSwitchBG"
+speedSwitchBG.Size = UDim2.fromOffset(44, 22)
+speedSwitchBG.Position = UDim2.new(1, -55, 0, 11.5)
+speedSwitchBG.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+speedSwitchBG.Text = ""
+speedSwitchBG.AutoButtonColor = false
+speedSwitchBG.Parent = speedBox
+
+local speedSwitchCorner = Instance.new("UICorner")
+speedSwitchCorner.CornerRadius = UDim.new(1, 0)
+speedSwitchCorner.Parent = speedSwitchBG
+
+local speedKnob = Instance.new("Frame")
+speedKnob.Name = "SpeedKnob"
+speedKnob.Size = UDim2.fromOffset(16, 16)
+speedKnob.Position = UDim2.new(0, 3, 0.5, -8)
+speedKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+speedKnob.BorderSizePixel = 0
+speedKnob.Parent = speedSwitchBG
+
+local speedKnobCorner = Instance.new("UICorner")
+speedKnobCorner.CornerRadius = UDim.new(1, 0)
+speedKnobCorner.Parent = speedKnob
+
+local speedControlFrame = Instance.new("Frame")
+speedControlFrame.Name = "SpeedControlFrame"
+speedControlFrame.Size = UDim2.new(1, -30, 0, 40)
+speedControlFrame.Position = UDim2.fromOffset(15, 45)
+speedControlFrame.BackgroundTransparency = 1
+speedControlFrame.Parent = speedBox
+
+local speedValText = Instance.new("TextLabel")
+speedValText.Name = "SpeedValText"
+speedValText.Size = UDim2.new(1, 0, 0, 18)
+speedValText.BackgroundTransparency = 1
+speedValText.Text = Translations.TH.ValText .. WalkSpeedValue
+speedValText.TextColor3 = Color3.fromRGB(180, 180, 190)
+speedValText.TextSize = 12
+speedValText.Font = Enum.Font.Gotham
+speedValText.TextXAlignment = Enum.TextXAlignment.Left
+speedValText.Parent = speedControlFrame
+
+local speedMinusBtn = Instance.new("TextButton")
+speedMinusBtn.Name = "SpeedMinusBtn"
+speedMinusBtn.Size = UDim2.fromOffset(30, 20)
+speedMinusBtn.Position = UDim2.fromOffset(0, 20)
+speedMinusBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+speedMinusBtn.Text = "-"
+speedMinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedMinusBtn.Font = Enum.Font.GothamBold
+speedMinusBtn.Parent = speedControlFrame
+
+local speedPlusBtn = Instance.new("TextButton")
+speedPlusBtn.Name = "SpeedPlusBtn"
+speedPlusBtn.Size = UDim2.fromOffset(30, 20)
+speedPlusBtn.Position = UDim2.fromOffset(35, 20)
+speedPlusBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+speedPlusBtn.Text = "+"
+speedPlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+speedPlusBtn.Font = Enum.Font.GothamBold
+speedPlusBtn.Parent = speedControlFrame
+
+local speedExpanded = false
+speedArrowBtn.Activated:Connect(function()
+	speedExpanded = not speedExpanded
+	speedArrowBtn.Text = speedExpanded and "▲" or "▼"
+	local targetHeight = speedExpanded and 95 or 45
+	TweenService:Create(speedBox, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -10, 0, targetHeight)}):Play()
+end)
+
+speedSwitchBG.Activated:Connect(function()
+	SpeedEnabled = not SpeedEnabled
+	local bgTarget = SpeedEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(50, 50, 60)
+	local knobTarget = SpeedEnabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+	TweenService:Create(speedSwitchBG, TweenInfo.new(0.2), {BackgroundColor3 = bgTarget}):Play()
+	TweenService:Create(speedKnob, TweenInfo.new(0.2), {Position = knobTarget}):Play()
+	if not SpeedEnabled and player.Character and player.Character:FindFirstChildOfClass("Humanoid") then
+		player.Character:FindFirstChildOfClass("Humanoid").WalkSpeed = 16
+	end
+end)
+
+speedMinusBtn.Activated:Connect(function()
+	WalkSpeedValue = math.max(16, WalkSpeedValue - 10)
+	speedValText.Text = Translations[currentLang].ValText .. WalkSpeedValue
+end)
+
+speedPlusBtn.Activated:Connect(function()
+	WalkSpeedValue = math.min(300, WalkSpeedValue + 10)
+	speedValText.Text = Translations[currentLang].ValText .. WalkSpeedValue
+end)
+
+-- Fly
+local flyBox = Instance.new("Frame")
+flyBox.Name = "FlyBox"
+flyBox.Size = UDim2.new(1, -10, 0, 45)
+flyBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+flyBox.BorderSizePixel = 0
+flyBox.ClipsDescendants = true
+flyBox.LayoutOrder = 2
+flyBox.Parent = miscPage
+
+local flyCorner = Instance.new("UICorner")
+flyCorner.CornerRadius = UDim.new(0, 8)
+flyCorner.Parent = flyBox
+
+local flyTitleLabel = Instance.new("TextLabel")
+flyTitleLabel.Name = "FlyTitleLabel"
+flyTitleLabel.Size = UDim2.new(1, -120, 0, 45)
+flyTitleLabel.Position = UDim2.fromOffset(15, 0)
+flyTitleLabel.BackgroundTransparency = 1
+flyTitleLabel.Text = Translations.TH.FlyTitle
+flyTitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+flyTitleLabel.TextSize = 13
+flyTitleLabel.Font = Enum.Font.GothamBold
+flyTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+flyTitleLabel.Parent = flyBox
+
+local flyArrowBtn = Instance.new("TextButton")
+flyArrowBtn.Name = "FlyArrowBtn"
+flyArrowBtn.Size = UDim2.fromOffset(30, 30)
+flyArrowBtn.Position = UDim2.new(1, -95, 0, 7.5)
+flyArrowBtn.BackgroundTransparency = 1
+flyArrowBtn.Text = "▼"
+flyArrowBtn.TextColor3 = Color3.fromRGB(180, 180, 200)
+flyArrowBtn.TextSize = 14
+flyArrowBtn.Font = Enum.Font.GothamBold
+flyArrowBtn.Parent = flyBox
+
+local flySwitchBG = Instance.new("TextButton")
+flySwitchBG.Name = "FlySwitchBG"
+flySwitchBG.Size = UDim2.fromOffset(44, 22)
+flySwitchBG.Position = UDim2.new(1, -55, 0, 11.5)
+flySwitchBG.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+flySwitchBG.Text = ""
+flySwitchBG.AutoButtonColor = false
+flySwitchBG.Parent = flyBox
+
+local flySwitchCorner = Instance.new("UICorner")
+flySwitchCorner.CornerRadius = UDim.new(1, 0)
+flySwitchCorner.Parent = flySwitchBG
+
+local flyKnob = Instance.new("Frame")
+flyKnob.Name = "FlyKnob"
+flyKnob.Size = UDim2.fromOffset(16, 16)
+flyKnob.Position = UDim2.new(0, 3, 0.5, -8)
+flyKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+flyKnob.BorderSizePixel = 0
+flyKnob.Parent = flySwitchBG
+
+local flyKnobCorner = Instance.new("UICorner")
+flyKnobCorner.CornerRadius = UDim.new(1, 0)
+flyKnobCorner.Parent = flyKnob
+
+local flyControlFrame = Instance.new("Frame")
+flyControlFrame.Name = "FlyControlFrame"
+flyControlFrame.Size = UDim2.new(1, -30, 0, 40)
+flyControlFrame.Position = UDim2.fromOffset(15, 45)
+flyControlFrame.BackgroundTransparency = 1
+flyControlFrame.Parent = flyBox
+
+local flyValText = Instance.new("TextLabel")
+flyValText.Name = "FlyValText"
+flyValText.Size = UDim2.new(1, 0, 0, 18)
+flyValText.BackgroundTransparency = 1
+flyValText.Text = Translations.TH.ValText .. FlySpeedValue
+flyValText.TextColor3 = Color3.fromRGB(180, 180, 190)
+flyValText.TextSize = 12
+flyValText.Font = Enum.Font.Gotham
+flyValText.TextXAlignment = Enum.TextXAlignment.Left
+flyValText.Parent = flyControlFrame
+
+local flyMinusBtn = Instance.new("TextButton")
+flyMinusBtn.Name = "FlyMinusBtn"
+flyMinusBtn.Size = UDim2.fromOffset(30, 20)
+flyMinusBtn.Position = UDim2.fromOffset(0, 20)
+flyMinusBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+flyMinusBtn.Text = "-"
+flyMinusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyMinusBtn.Font = Enum.Font.GothamBold
+flyMinusBtn.Parent = flyControlFrame
+
+local flyPlusBtn = Instance.new("TextButton")
+flyPlusBtn.Name = "FlyPlusBtn"
+flyPlusBtn.Size = UDim2.fromOffset(30, 20)
+flyPlusBtn.Position = UDim2.fromOffset(35, 20)
+flyPlusBtn.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+flyPlusBtn.Text = "+"
+flyPlusBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+flyPlusBtn.Font = Enum.Font.GothamBold
+flyPlusBtn.Parent = flyControlFrame
+
+local flyExpanded = false
+flyArrowBtn.Activated:Connect(function()
+	flyExpanded = not flyExpanded
+	flyArrowBtn.Text = flyExpanded and "▲" or "▼"
+	local targetHeight = flyExpanded and 95 or 45
+	TweenService:Create(flyBox, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -10, 0, targetHeight)}):Play()
+end)
+
+local function stopFlying()
+	if flyBodyVel then flyBodyVel:Destroy() flyBodyVel = nil end
+	if flyBodyGyro then flyBodyGyro:Destroy() flyBodyGyro = nil end
+end
+
+local function startFlying()
+	stopFlying()
+	local char = player.Character
+	local hrp = char and char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+	flyBodyVel = Instance.new("BodyVelocity")
+	flyBodyVel.MaxForce = Vector3.new(1, 1, 1) * 9e9
+	flyBodyVel.Velocity = Vector3.zero
+	flyBodyVel.Parent = hrp
+	flyBodyGyro = Instance.new("BodyGyro")
+	flyBodyGyro.MaxTorque = Vector3.new(1, 1, 1) * 9e9
+	flyBodyGyro.CFrame = hrp.CFrame
+	flyBodyGyro.Parent = hrp
+	task.spawn(function()
+		while FlyEnabled and hrp and flyBodyVel and flyBodyGyro do
+			flyBodyGyro.CFrame = Camera.CFrame
+			flyBodyVel.Velocity = Camera.CFrame.LookVector * FlySpeedValue
+			task.wait()
+		end
+		stopFlying()
+	end)
+end
+
+flySwitchBG.Activated:Connect(function()
+	FlyEnabled = not FlyEnabled
+	local bgTarget = FlyEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(50, 50, 60)
+	local knobTarget = FlyEnabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+	TweenService:Create(flySwitchBG, TweenInfo.new(0.2), {BackgroundColor3 = bgTarget}):Play()
+	TweenService:Create(flyKnob, TweenInfo.new(0.2), {Position = knobTarget}):Play()
+	if FlyEnabled then startFlying() else stopFlying() end
+end)
+
+flyMinusBtn.Activated:Connect(function()
+	FlySpeedValue = math.max(10, FlySpeedValue - 10)
+	flyValText.Text = Translations[currentLang].ValText .. FlySpeedValue
+end)
+
+flyPlusBtn.Activated:Connect(function()
+	FlySpeedValue = math.min(300, FlySpeedValue + 10)
+	flyValText.Text = Translations[currentLang].ValText .. FlySpeedValue
+end)
+
+-- Teleport
+local tpBox = Instance.new("Frame")
+tpBox.Name = "TeleportBox"
+tpBox.Size = UDim2.new(1, -10, 0, 45)
+tpBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+tpBox.BorderSizePixel = 0
+tpBox.ClipsDescendants = true
+tpBox.LayoutOrder = 3
+tpBox.Parent = miscPage
+
+local tpCorner = Instance.new("UICorner")
+tpCorner.CornerRadius = UDim.new(0, 8)
+tpCorner.Parent = tpBox
+
+local tpTitleLabel = Instance.new("TextLabel")
+tpTitleLabel.Name = "TeleportTitleLabel"
+tpTitleLabel.Size = UDim2.new(1, -60, 0, 45)
+tpTitleLabel.Position = UDim2.fromOffset(15, 0)
+tpTitleLabel.BackgroundTransparency = 1
+tpTitleLabel.Text = Translations.TH.TeleportTitle
+tpTitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+tpTitleLabel.TextSize = 13
+tpTitleLabel.Font = Enum.Font.GothamBold
+tpTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+tpTitleLabel.Parent = tpBox
+
+local tpArrowBtn = Instance.new("TextButton")
+tpArrowBtn.Name = "TeleportArrowBtn"
+tpArrowBtn.Size = UDim2.fromOffset(30, 30)
+tpArrowBtn.Position = UDim2.new(1, -40, 0, 7.5)
+tpArrowBtn.BackgroundTransparency = 1
+tpArrowBtn.Text = "▼"
+tpArrowBtn.TextColor3 = Color3.fromRGB(180, 180, 200)
+tpArrowBtn.TextSize = 14
+tpArrowBtn.Font = Enum.Font.GothamBold
+tpArrowBtn.Parent = tpBox
+
+local tpControlFrame = Instance.new("Frame")
+tpControlFrame.Name = "TeleportControlFrame"
+tpControlFrame.Size = UDim2.new(1, -30, 0, 130)
+tpControlFrame.Position = UDim2.fromOffset(15, 45)
+tpControlFrame.BackgroundTransparency = 1
+tpControlFrame.Parent = tpBox
+
+local tpScrollList = Instance.new("ScrollingFrame")
+tpScrollList.Name = "TeleportScrollList"
+tpScrollList.Size = UDim2.new(1, 0, 0, 85)
+tpScrollList.Position = UDim2.fromOffset(0, 0)
+tpScrollList.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
+tpScrollList.BorderSizePixel = 0
+tpScrollList.ScrollBarThickness = 3
+tpScrollList.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 75)
+tpScrollList.Parent = tpControlFrame
+
+local tpScrollCorner = Instance.new("UICorner")
+tpScrollCorner.CornerRadius = UDim.new(0, 6)
+tpScrollCorner.Parent = tpScrollList
+
+local tpListLayout = Instance.new("UIListLayout")
+tpListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+tpListLayout.Padding = UDim.new(0, 4)
+tpListLayout.Parent = tpScrollList
+tpListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	tpScrollList.CanvasSize = UDim2.fromOffset(0, tpListLayout.AbsoluteContentSize.Y + 8)
+end)
+
+local tpConfirmBtn = Instance.new("TextButton")
+tpConfirmBtn.Name = "TeleportConfirmBtn"
+tpConfirmBtn.Size = UDim2.new(1, 0, 0, 32)
+tpConfirmBtn.Position = UDim2.fromOffset(0, 93)
+tpConfirmBtn.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+tpConfirmBtn.Text = Translations.TH.ConfirmText
+tpConfirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+tpConfirmBtn.TextSize = 12
+tpConfirmBtn.Font = Enum.Font.GothamBold
+tpConfirmBtn.Parent = tpControlFrame
+
+local tpConfirmCorner = Instance.new("UICorner")
+tpConfirmCorner.CornerRadius = UDim.new(0, 6)
+tpConfirmCorner.Parent = tpConfirmBtn
+
+local tpExpanded = false
+tpArrowBtn.Activated:Connect(function()
+	tpExpanded = not tpExpanded
+	tpArrowBtn.Text = tpExpanded and "▲" or "▼"
+	local targetHeight = tpExpanded and 185 or 45
+	TweenService:Create(tpBox, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -10, 0, targetHeight)}):Play()
+end)
+
+tpConfirmBtn.Activated:Connect(function()
+	if selectedTpPlayer and selectedTpPlayer.Character and selectedTpPlayer.Character:FindFirstChild("HumanoidRootPart") then
+		local myChar = player.Character
+		local myHrp = myChar and myChar:FindFirstChild("HumanoidRootPart")
+		if myHrp then
+			myHrp.CFrame = selectedTpPlayer.Character.HumanoidRootPart.CFrame * CFrame.new(0, 0, 3)
+		end
+	end
+end)
+
+-- Copy Skin
+local copySkinBox = Instance.new("Frame")
+copySkinBox.Name = "CopySkinBox"
+copySkinBox.Size = UDim2.new(1, -10, 0, 45)
+copySkinBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+copySkinBox.BorderSizePixel = 0
+copySkinBox.ClipsDescendants = true
+copySkinBox.LayoutOrder = 4
+copySkinBox.Parent = miscPage
+
+local copySkinCorner = Instance.new("UICorner")
+copySkinCorner.CornerRadius = UDim.new(0, 8)
+copySkinCorner.Parent = copySkinBox
+
+local copySkinTitleLabel = Instance.new("TextLabel")
+copySkinTitleLabel.Name = "CopySkinTitleLabel"
+copySkinTitleLabel.Size = UDim2.new(1, -60, 0, 45)
+copySkinTitleLabel.Position = UDim2.fromOffset(15, 0)
+copySkinTitleLabel.BackgroundTransparency = 1
+copySkinTitleLabel.Text = Translations.TH.CopySkinTitle
+copySkinTitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+copySkinTitleLabel.TextSize = 13
+copySkinTitleLabel.Font = Enum.Font.GothamBold
+copySkinTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+copySkinTitleLabel.Parent = copySkinBox
+
+local copySkinArrowBtn = Instance.new("TextButton")
+copySkinArrowBtn.Name = "CopySkinArrowBtn"
+copySkinArrowBtn.Size = UDim2.fromOffset(30, 30)
+copySkinArrowBtn.Position = UDim2.new(1, -40, 0, 7.5)
+copySkinArrowBtn.BackgroundTransparency = 1
+copySkinArrowBtn.Text = "▼"
+copySkinArrowBtn.TextColor3 = Color3.fromRGB(180, 180, 200)
+copySkinArrowBtn.TextSize = 14
+copySkinArrowBtn.Font = Enum.Font.GothamBold
+copySkinArrowBtn.Parent = copySkinBox
+
+local copySkinControlFrame = Instance.new("Frame")
+copySkinControlFrame.Name = "CopySkinControlFrame"
+copySkinControlFrame.Size = UDim2.new(1, -30, 0, 130)
+copySkinControlFrame.Position = UDim2.fromOffset(15, 45)
+copySkinControlFrame.BackgroundTransparency = 1
+copySkinControlFrame.Parent = copySkinBox
+
+local copySkinScrollList = Instance.new("ScrollingFrame")
+copySkinScrollList.Name = "CopySkinScrollList"
+copySkinScrollList.Size = UDim2.new(1, 0, 0, 85)
+copySkinScrollList.Position = UDim2.fromOffset(0, 0)
+copySkinScrollList.BackgroundColor3 = Color3.fromRGB(16, 16, 22)
+copySkinScrollList.BorderSizePixel = 0
+copySkinScrollList.ScrollBarThickness = 3
+copySkinScrollList.ScrollBarImageColor3 = Color3.fromRGB(60, 60, 75)
+copySkinScrollList.Parent = copySkinControlFrame
+
+local copySkinScrollCorner = Instance.new("UICorner")
+copySkinScrollCorner.CornerRadius = UDim.new(0, 6)
+copySkinScrollCorner.Parent = copySkinScrollList
+
+local copySkinListLayout = Instance.new("UIListLayout")
+copySkinListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+copySkinListLayout.Padding = UDim.new(0, 4)
+copySkinListLayout.Parent = copySkinScrollList
+copySkinListLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+	copySkinScrollList.CanvasSize = UDim2.fromOffset(0, copySkinListLayout.AbsoluteContentSize.Y + 8)
+end)
+
+local copySkinConfirmBtn = Instance.new("TextButton")
+copySkinConfirmBtn.Name = "CopySkinConfirmBtn"
+copySkinConfirmBtn.Size = UDim2.new(1, 0, 0, 32)
+copySkinConfirmBtn.Position = UDim2.fromOffset(0, 93)
+copySkinConfirmBtn.BackgroundColor3 = Color3.fromRGB(155, 89, 182)
+copySkinConfirmBtn.Text = Translations.TH.ConfirmText
+copySkinConfirmBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+copySkinConfirmBtn.TextSize = 12
+copySkinConfirmBtn.Font = Enum.Font.GothamBold
+copySkinConfirmBtn.Parent = copySkinControlFrame
+
+local copySkinConfirmCorner = Instance.new("UICorner")
+copySkinConfirmCorner.CornerRadius = UDim.new(0, 6)
+copySkinConfirmCorner.Parent = copySkinConfirmBtn
+
+local copySkinExpanded = false
+copySkinArrowBtn.Activated:Connect(function()
+	copySkinExpanded = not copySkinExpanded
+	copySkinArrowBtn.Text = copySkinExpanded and "▲" or "▼"
+	local targetHeight = copySkinExpanded and 185 or 45
+	TweenService:Create(copySkinBox, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Size = UDim2.new(1, -10, 0, targetHeight)}):Play()
+end)
+
+copySkinConfirmBtn.Activated:Connect(function()
+	if not selectedCopySkinPlayer then return end
+	local myChar = player.Character
+	if not myChar then return end
+	local myHum = myChar:FindFirstChildOfClass("Humanoid")
+	if not myHum then return end
+	task.spawn(function()
+		pcall(function()
+			local humDesc = Players:GetHumanoidDescriptionFromUserId(selectedCopySkinPlayer.UserId)
+			if humDesc and myHum then
+				myHum:ApplyDescription(humDesc)
+			end
+		end)
+	end)
+end)
+
+-- RefreshPlayerLists
+local function RefreshPlayerLists()
+	for _, child in ipairs(tpScrollList:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
+	for _, child in ipairs(copySkinScrollList:GetChildren()) do
+		if child:IsA("TextButton") then child:Destroy() end
+	end
+	for _, targetPlayer in ipairs(Players:GetPlayers()) do
+		if targetPlayer ~= player then
+			local tpItem = Instance.new("TextButton")
+			tpItem.Size = UDim2.new(1, -8, 0, 26)
+			tpItem.BackgroundColor3 = (selectedTpPlayer == targetPlayer) and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(30, 30, 40)
+			tpItem.Text = targetPlayer.DisplayName .. " (@" .. targetPlayer.Name .. ")"
+			tpItem.TextColor3 = Color3.fromRGB(240, 240, 240)
+			tpItem.TextSize = 11
+			tpItem.Font = Enum.Font.Gotham
+			tpItem.Parent = tpScrollList
+			local tpItemCorner = Instance.new("UICorner")
+			tpItemCorner.CornerRadius = UDim.new(0, 4)
+			tpItemCorner.Parent = tpItem
+			tpItem.Activated:Connect(function()
+				selectedTpPlayer = targetPlayer
+				RefreshPlayerLists()
+			end)
+
+			local csItem = Instance.new("TextButton")
+			csItem.Size = UDim2.new(1, -8, 0, 26)
+			csItem.BackgroundColor3 = (selectedCopySkinPlayer == targetPlayer) and Color3.fromRGB(155, 89, 182) or Color3.fromRGB(30, 30, 40)
+			csItem.Text = targetPlayer.DisplayName .. " (@" .. targetPlayer.Name .. ")"
+			csItem.TextColor3 = Color3.fromRGB(240, 240, 240)
+			csItem.TextSize = 11
+			csItem.Font = Enum.Font.Gotham
+			csItem.Parent = copySkinScrollList
+			local csItemCorner = Instance.new("UICorner")
+			csItemCorner.CornerRadius = UDim.new(0, 4)
+			csItemCorner.Parent = csItem
+			csItem.Activated:Connect(function()
+				selectedCopySkinPlayer = targetPlayer
+				RefreshPlayerLists()
+			end)
+		end
+	end
+end
+Players.PlayerAdded:Connect(RefreshPlayerLists)
+Players.PlayerRemoving:Connect(function(leftPlayer)
+	if selectedTpPlayer == leftPlayer then selectedTpPlayer = nil end
+	if selectedCopySkinPlayer == leftPlayer then selectedCopySkinPlayer = nil end
+	RefreshPlayerLists()
+end)
+RefreshPlayerLists()
+
+-- God Mode
+local godmodeBox = Instance.new("Frame")
+godmodeBox.Name = "GodModeBox"
+godmodeBox.Size = UDim2.new(1, -10, 0, 45)
+godmodeBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+godmodeBox.BorderSizePixel = 0
+godmodeBox.LayoutOrder = 5
+godmodeBox.Parent = miscPage
+
+local godmodeCorner = Instance.new("UICorner")
+godmodeCorner.CornerRadius = UDim.new(0, 8)
+godmodeCorner.Parent = godmodeBox
+
+local godmodeTitleLabel = Instance.new("TextLabel")
+godmodeTitleLabel.Name = "GodModeTitleLabel"
+godmodeTitleLabel.Size = UDim2.new(1, -70, 1, 0)
+godmodeTitleLabel.Position = UDim2.fromOffset(15, 0)
+godmodeTitleLabel.BackgroundTransparency = 1
+godmodeTitleLabel.Text = Translations.TH.GodModeTitle
+godmodeTitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+godmodeTitleLabel.TextSize = 13
+godmodeTitleLabel.Font = Enum.Font.GothamBold
+godmodeTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+godmodeTitleLabel.Parent = godmodeBox
+
+local godmodeSwitchBG = Instance.new("TextButton")
+godmodeSwitchBG.Name = "GodModeSwitchBG"
+godmodeSwitchBG.Size = UDim2.fromOffset(44, 22)
+godmodeSwitchBG.Position = UDim2.new(1, -55, 0, 11.5)
+godmodeSwitchBG.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+godmodeSwitchBG.Text = ""
+godmodeSwitchBG.AutoButtonColor = false
+godmodeSwitchBG.Parent = godmodeBox
+
+local godmodeSwitchCorner = Instance.new("UICorner")
+godmodeSwitchCorner.CornerRadius = UDim.new(1, 0)
+godmodeSwitchCorner.Parent = godmodeSwitchBG
+
+local godmodeKnob = Instance.new("Frame")
+godmodeKnob.Name = "GodModeKnob"
+godmodeKnob.Size = UDim2.fromOffset(16, 16)
+godmodeKnob.Position = UDim2.new(0, 3, 0.5, -8)
+godmodeKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+godmodeKnob.BorderSizePixel = 0
+godmodeKnob.Parent = godmodeSwitchBG
+
+local godmodeKnobCorner = Instance.new("UICorner")
+godmodeKnobCorner.CornerRadius = UDim.new(1, 0)
+godmodeKnobCorner.Parent = godmodeKnob
+
+godmodeSwitchBG.Activated:Connect(function()
+	GodModeEnabled = not GodModeEnabled
+	local bgTarget = GodModeEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(50, 50, 60)
+	local knobTarget = GodModeEnabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+	TweenService:Create(godmodeSwitchBG, TweenInfo.new(0.2), {BackgroundColor3 = bgTarget}):Play()
+	TweenService:Create(godmodeKnob, TweenInfo.new(0.2), {Position = knobTarget}):Play()
+end)
+
+-- Invis
+local invisBox = Instance.new("Frame")
+invisBox.Name = "InvisBox"
+invisBox.Size = UDim2.new(1, -10, 0, 45)
+invisBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+invisBox.BorderSizePixel = 0
+invisBox.LayoutOrder = 6
+invisBox.Parent = miscPage
+
+local invisCorner = Instance.new("UICorner")
+invisCorner.CornerRadius = UDim.new(0, 8)
+invisCorner.Parent = invisBox
+
+local invisTitleLabel = Instance.new("TextLabel")
+invisTitleLabel.Name = "InvisTitleLabel"
+invisTitleLabel.Size = UDim2.new(1, -70, 1, 0)
+invisTitleLabel.Position = UDim2.fromOffset(15, 0)
+invisTitleLabel.BackgroundTransparency = 1
+invisTitleLabel.Text = Translations.TH.InvisTitle
+invisTitleLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+invisTitleLabel.TextSize = 13
+invisTitleLabel.Font = Enum.Font.GothamBold
+invisTitleLabel.TextXAlignment = Enum.TextXAlignment.Left
+invisTitleLabel.Parent = invisBox
+
+local invisSwitchBG = Instance.new("TextButton")
+invisSwitchBG.Name = "InvisSwitchBG"
+invisSwitchBG.Size = UDim2.fromOffset(44, 22)
+invisSwitchBG.Position = UDim2.new(1, -55, 0, 11.5)
+invisSwitchBG.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+invisSwitchBG.Text = ""
+invisSwitchBG.AutoButtonColor = false
+invisSwitchBG.Parent = invisBox
+
+local invisSwitchCorner = Instance.new("UICorner")
+invisSwitchCorner.CornerRadius = UDim.new(1, 0)
+invisSwitchCorner.Parent = invisSwitchBG
+
+local invisKnob = Instance.new("Frame")
+invisKnob.Name = "InvisKnob"
+invisKnob.Size = UDim2.fromOffset(16, 16)
+invisKnob.Position = UDim2.new(0, 3, 0.5, -8)
+invisKnob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+invisKnob.BorderSizePixel = 0
+invisKnob.Parent = invisSwitchBG
+
+local invisKnobCorner = Instance.new("UICorner")
+invisKnobCorner.CornerRadius = UDim.new(1, 0)
+invisKnobCorner.Parent = invisKnob
+
+local function setCharacterInvisibility(state)
+	local char = player.Character
+	if not char then return end
+	for _, part in pairs(char:GetDescendants()) do
+		if part:IsA("BasePart") or part:IsA("Decal") then
+			if state then
+				if not part:FindFirstChild("OldTransparency") then
+					local val = Instance.new("NumberValue")
+					val.Name = "OldTransparency"
+					val.Value = part.Transparency
+					val.Parent = part
+				end
+				part.Transparency = 1
+			else
+				if part:FindFirstChild("OldTransparency") then
+					part.Transparency = part.OldTransparency.Value
+					part.OldTransparency:Destroy()
+				else
+					if part.Name == "HumanoidRootPart" then
+						part.Transparency = 1
+					else
+						part.Transparency = 0
+					end
+				end
+			end
+		end
+	end
+end
+
+invisSwitchBG.Activated:Connect(function()
+	InvisEnabled = not InvisEnabled
+	local bgTarget = InvisEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(50, 50, 60)
+	local knobTarget = InvisEnabled and UDim2.new(1, -19, 0.5, -8) or UDim2.new(0, 3, 0.5, -8)
+	TweenService:Create(invisSwitchBG, TweenInfo.new(0.2), {BackgroundColor3 = bgTarget}):Play()
+	TweenService:Create(invisKnob, TweenInfo.new(0.2), {Position = knobTarget}):Play()
+	setCharacterInvisibility(InvisEnabled)
+end)
+
+-- updatePlayerLoop
+local function updatePlayerLoop()
+	local char = player.Character
+	local hum = char and char:FindFirstChildOfClass("Humanoid")
+	local langData = Translations[currentLang] or Translations.TH
+	local elapsed = os.clock() - scriptStartClock
+	playTimeLabel.Text = langData.PlayTimeText .. " " .. FormatTime(elapsed)
+
+	if hum then
+		if GodModeEnabled then
+			hum.MaxHealth = 999999
+			hum.Health = 999999
+		end
+		local hp = math.max(0, math.floor(hum.Health))
+		local maxHp = math.floor(hum.MaxHealth)
+		local percent = math.clamp(hp / maxHp, 0, 1)
+		healthTextLabel.Text = langData.HealthText .. " " .. (GodModeEnabled and "∞" or hp) .. " / " .. (GodModeEnabled and "∞" or maxHp)
+		healthBarFill.Size = UDim2.new(GodModeEnabled and 1 or percent, 0, 1, 0)
+		if percent > 0.5 or GodModeEnabled then
+			healthBarFill.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+		elseif percent > 0.2 then
+			healthBarFill.BackgroundColor3 = Color3.fromRGB(241, 196, 15)
+		else
+			healthBarFill.BackgroundColor3 = Color3.fromRGB(231, 76, 60)
+		end
+		if SpeedEnabled then
+			hum.WalkSpeed = WalkSpeedValue
+		end
+	else
+		healthTextLabel.Text = langData.HealthText .. " 0 / 0"
+		healthBarFill.Size = UDim2.new(0, 0, 1, 0)
+	end
+
+	if InvisEnabled then
+		setCharacterInvisibility(true)
+	end
+end
+RunService.Heartbeat:Connect(updatePlayerLoop)
+
+--==================================================
+-- MAIN CONTROL - ภาษา
+--==================================================
+local controlPage = tabPages["MAIN CONTROL"]
+
+local langBox = Instance.new("Frame")
+langBox.Name = "LangBox"
+langBox.Size = UDim2.new(1, -10, 0, 95)
+langBox.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+langBox.BorderSizePixel = 0
+langBox.Parent = controlPage
+
+local langBoxCorner = Instance.new("UICorner")
+langBoxCorner.CornerRadius = UDim.new(0, 8)
+langBoxCorner.Parent = langBox
+
+local langLabel = Instance.new("TextLabel")
+langLabel.Name = "LangLabel"
+langLabel.Size = UDim2.new(1, -20, 0, 30)
+langLabel.Position = UDim2.fromOffset(15, 5)
+langLabel.BackgroundTransparency = 1
+langLabel.Text = Translations.TH.LangTitle
+langLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+langLabel.TextSize = 14
+langLabel.Font = Enum.Font.GothamBold
+langLabel.TextXAlignment = Enum.TextXAlignment.Left
+langLabel.Parent = langBox
+
+local langBtnContainer = Instance.new("Frame")
+langBtnContainer.Name = "LangBtnContainer"
+langBtnContainer.Size = UDim2.new(1, -30, 0, 40)
+langBtnContainer.Position = UDim2.fromOffset(15, 42)
+langBtnContainer.BackgroundTransparency = 1
+langBtnContainer.Parent = langBox
+
+local langLayout = Instance.new("UIListLayout")
+langLayout.FillDirection = Enum.FillDirection.Horizontal
+langLayout.SortOrder = Enum.SortOrder.LayoutOrder
+langLayout.Padding = UDim.new(0, 8)
+langLayout.Parent = langBtnContainer
+
+local langList = {
+	{Code = "TH", Name = "🇹🇭 ไทย"},
+	{Code = "EN", Name = "🇺🇸 English"},
+	{Code = "VN", Name = "🇻🇳 Tiếng Việt"},
+	{Code = "ID", Name = "🇮🇩 Indonesia"}
+}
+local langButtons = {}
+
+--==================================================
+-- COMBAT - ESP
+--==================================================
+local combatPage = tabPages["COMBAT"]
+
+local espRow = Instance.new("Frame")
+espRow.Name = "ESPRow"
+espRow.Size = UDim2.new(1, -10, 0, 50)
+espRow.BackgroundColor3 = Color3.fromRGB(22, 22, 28)
+espRow.BorderSizePixel = 0
+espRow.Parent = combatPage
+
+local espRowCorner = Instance.new("UICorner")
+espRowCorner.CornerRadius = UDim.new(0, 8)
+espRowCorner.Parent = espRow
+
+local espLabel = Instance.new("TextLabel")
+espLabel.Name = "ESPLabel"
+espLabel.Size = UDim2.new(1, -70, 1, 0)
+espLabel.Position = UDim2.fromOffset(15, 0)
+espLabel.BackgroundTransparency = 1
+espLabel.Text = Translations.TH.ESPLabel
+espLabel.TextColor3 = Color3.fromRGB(240, 240, 240)
+espLabel.TextSize = 14
+espLabel.Font = Enum.Font.GothamBold
+espLabel.TextXAlignment = Enum.TextXAlignment.Left
+espLabel.Parent = espRow
+
+local switchBG = Instance.new("TextButton")
+switchBG.Name = "SwitchBG"
+switchBG.Size = UDim2.fromOffset(48, 24)
+switchBG.Position = UDim2.new(1, -60, 0.5, -12)
+switchBG.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+switchBG.Text = ""
+switchBG.AutoButtonColor = false
+switchBG.Parent = espRow
+
+local switchCorner = Instance.new("UICorner")
+switchCorner.CornerRadius = UDim.new(1, 0)
+switchCorner.Parent = switchBG
+
+local knob = Instance.new("Frame")
+knob.Name = "Knob"
+knob.Size = UDim2.fromOffset(18, 18)
+knob.Position = UDim2.new(0, 3, 0.5, -9)
+knob.BackgroundColor3 = Color3.fromRGB(255, 255, 255)
+knob.BorderSizePixel = 0
+knob.Parent = switchBG
+
+local knobCorner = Instance.new("UICorner")
+knobCorner.CornerRadius = UDim.new(1, 0)
+knobCorner.Parent = knob
+
+switchBG.Activated:Connect(function()
+	ESPEnabled = not ESPEnabled
+	local bgTargetColor = ESPEnabled and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(50, 50, 60)
+	local knobTargetPos = ESPEnabled and UDim2.new(1, -21, 0.5, -9) or UDim2.new(0, 3, 0.5, -9)
+	TweenService:Create(switchBG, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {BackgroundColor3 = bgTargetColor}):Play()
+	TweenService:Create(knob, TweenInfo.new(0.2, Enum.EasingStyle.Quad, Enum.EasingDirection.Out), {Position = knobTargetPos}):Play()
+	if not ESPEnabled then
+		for _, data in pairs(espObjects) do
+			if data.Line then data.Line.Visible = false end
+			if data.Box then data.Box.Visible = false end
+		end
+	end
+end)
+
+--==================================================
+-- SetLanguage
+--==================================================
+local function SetLanguage(langCode)
+	if not Translations[langCode] then return end
+	currentLang = langCode
+	local data = Translations[langCode]
+
+	hubSubTitle.Text = data.SubTitle
+	searchLabel.Text = data.Search
+	langLabel.Text = data.LangTitle
+	espLabel.Text = data.ESPLabel
+	speedTitleLabel.Text = data.SpeedTitle
+	flyTitleLabel.Text = data.FlyTitle
+	tpTitleLabel.Text = data.TeleportTitle
+	copySkinTitleLabel.Text = data.CopySkinTitle
+	godmodeTitleLabel.Text = data.GodModeTitle
+	invisTitleLabel.Text = data.InvisTitle
+	tpConfirmBtn.Text = data.ConfirmText
+	copySkinConfirmBtn.Text = data.ConfirmText
+	speedValText.Text = data.ValText .. WalkSpeedValue
+	flyValText.Text = data.ValText .. FlySpeedValue
+	deviceLabel.Text = data.DeviceText .. " " .. GetDeviceType()
+	scriptTimeLabel.Text = data.ScriptTimeText .. " " .. scriptStartTimestamp
+	gameTitleLabel.Text = data.GameInfoTitle
+	placeIdLabel.Text = data.PlaceIdText .. " " .. game.PlaceId
+
+	for keyName, buttonObj in pairs(tabButtons) do
+		if data.Tabs[keyName] then
+			buttonObj.Text = data.Tabs[keyName]
+		end
+	end
+	for code, btnObj in pairs(langButtons) do
+		if code == langCode then
+			btnObj.BackgroundColor3 = Color3.fromRGB(46, 204, 113)
+			btnObj.TextColor3 = Color3.fromRGB(255, 255, 255)
+		else
+			btnObj.BackgroundColor3 = Color3.fromRGB(35, 35, 45)
+			btnObj.TextColor3 = Color3.fromRGB(180, 180, 190)
+		end
+	end
+end
+
+for i, item in ipairs(langList) do
+	local lBtn = Instance.new("TextButton")
+	lBtn.Name = item.Code .. "_LangBtn"
+	lBtn.Size = UDim2.fromOffset(85, 32)
+	lBtn.BackgroundColor3 = (item.Code == "TH") and Color3.fromRGB(46, 204, 113) or Color3.fromRGB(35, 35, 45)
+	lBtn.Text = item.Name
+	lBtn.TextColor3 = (item.Code == "TH") and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(180, 180, 190)
+	lBtn.TextSize = 11
+	lBtn.Font = Enum.Font.GothamBold
+	lBtn.AutoButtonColor = false
+	lBtn.Parent = langBtnContainer
+	local lCorner = Instance.new("UICorner")
+	lCorner.CornerRadius = UDim.new(0, 6)
+	lCorner.Parent = lBtn
+	langButtons[item.Code] = lBtn
+	lBtn.Activated:Connect(function()
+		SetLanguage(item.Code)
+	end)
+end
+
+--==================================================
+-- ESP System
+--==================================================
+local function DrawLineBetween(frame, p1, p2)
+	local deltaX = p2.X - p1.X
+	local deltaY = p2.Y - p1.Y
+	local distance = math.sqrt(deltaX * deltaX + deltaY * deltaY)
+	if distance < 2 then
+		frame.Visible = false
+		return
+	end
+	local midX = (p1.X + p2.X) / 2
+	local midY = (p1.Y + p2.Y) / 2
+	local angle = math.atan2(deltaY, deltaX)
+	frame.AnchorPoint = Vector2.new(0.5, 0.5)
+	frame.Position = UDim2.fromOffset(midX, midY)
+	frame.Size = UDim2.fromOffset(distance, 1.5)
+	frame.Rotation = math.deg(angle)
+	frame.Visible = true
+end
+
+local function CreateESP(targetPlayer)
+	if espObjects[targetPlayer] then return end
+	local line = Instance.new("Frame")
+	line.Name = targetPlayer.Name .. "_Tracer"
+	line.AnchorPoint = Vector2.new(0.5, 0.5)
+	line.BackgroundColor3 = LineColor
+	line.BorderSizePixel = 0
+	line.ZIndex = 2
+	line.Visible = false
+	line.Parent = espFolder
+
+	local box = Instance.new("Frame")
+	box.Name = targetPlayer.Name .. "_Box"
+	box.AnchorPoint = Vector2.new(0.5, 0.5)
+	box.BackgroundTransparency = 1
+	box.BorderSizePixel = 0
+	box.ZIndex = 3
+	box.Visible = false
+	box.Parent = espFolder
+
+	local boxStroke = Instance.new("UIStroke")
+	boxStroke.Color = LineColor
+	boxStroke.Thickness = 1.5
+	boxStroke.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+	boxStroke.Parent = box
+
+	espObjects[targetPlayer] = {Line = line, Box = box}
+end
+
+local function RemoveESP(targetPlayer)
+	if espObjects[targetPlayer] then
+		if espObjects[targetPlayer].Line then espObjects[targetPlayer].Line:Destroy() end
+		if espObjects[targetPlayer].Box then espObjects[targetPlayer].Box:Destroy() end
+		espObjects[targetPlayer] = nil
+	end
+end
+
+Players.PlayerRemoving:Connect(RemoveESP)
+
+RunService.RenderStepped:Connect(function()
+	if not ESPEnabled then return end
+	local viewportSize = Camera.ViewportSize
+	local bottomCenterScreen = Vector2.new(viewportSize.X / 2, viewportSize.Y)
+	for _, targetPlayer in pairs(Players:GetPlayers()) do
+		if targetPlayer ~= player then
+			CreateESP(targetPlayer)
+			local data = espObjects[targetPlayer]
+			if data and data.Line and data.Box then
+				local char = targetPlayer.Character
+				local hrp = char and char:FindFirstChild("HumanoidRootPart")
+				local hum = char and char:FindFirstChildOfClass("Humanoid")
+				if char and hrp and hum and hum.Health > 0 then
+					local cf, size = char:GetBoundingBox()
+					local topWorld = (cf + Vector3.new(0, size.Y / 2, 0)).Position
+					local bottomWorld = (cf - Vector3.new(0, size.Y / 2, 0)).Position
+					local topScreen, topOnScreen = Camera:WorldToViewportPoint(topWorld)
+					local bottomScreen, bottomOnScreen = Camera:WorldToViewportPoint(bottomWorld)
+					if topOnScreen and bottomOnScreen and topScreen.Z > 0 and bottomScreen.Z > 0 then
+						local topV2 = Vector2.new(topScreen.X, topScreen.Y)
+						local bottomV2 = Vector2.new(bottomScreen.X, bottomScreen.Y)
+						local centerV2 = Vector2.new((topV2.X + bottomV2.X) / 2, (topV2.Y + bottomV2.Y) / 2)
+						local boxHeight = math.abs(topV2.Y - bottomV2.Y)
+						local boxWidth = boxHeight / 2
+						if boxHeight > 5 then
+							data.Box.Size = UDim2.fromOffset(boxWidth, boxHeight)
+							data.Box.Position = UDim2.fromOffset(centerV2.X, centerV2.Y)
+							data.Box.Visible = true
+							DrawLineBetween(data.Line, bottomCenterScreen, centerV2)
+						else
+							data.Line.Visible = false
+							data.Box.Visible = false
+						end
+					else
+						data.Line.Visible = false
+						data.Box.Visible = false
+					end
+				else
+					data.Line.Visible = false
+					data.Box.Visible = false
+				end
+			end
+		end
+	end
+end)
+
+--==================================================
+-- เปิด/ปิดเมนู + อนิเมชัน
+--==================================================
+local opened = false
+local animating = false
+
+local function openMenu()
+	if animating then return end
+	animating = true
+	opened = true
+	mainFrame.Visible = true
+	mainScale.Scale = 0.75
+	local tween = TweenService:Create(mainScale, TweenInfo.new(0.3, Enum.EasingStyle.Quint, Enum.EasingDirection.Out), {Scale = 1})
+	tween:Play()
+	tween.Completed:Wait()
+	animating = false
+end
+
+local function closeMenu()
+	if animating then return end
+	animating = true
+	opened = false
+	local tween = TweenService:Create(mainScale, TweenInfo.new(0.22, Enum.EasingStyle.Quint, Enum.EasingDirection.In), {Scale = 0.75})
+	tween:Play()
+	tween.Completed:Wait()
+	mainFrame.Visible = false
+	animating = false
+end
+
+floatBtn.Activated:Connect(function()
+	if opened then closeMenu() else openMenu() end
+end)
+closeBtn.Activated:Connect(closeMenu)
+minimizeBtn.Activated:Connect(closeMenu)
+
+--==================================================
+-- ลากปุ่มลอย
+--==================================================
+local draggingButton = false
+local buttonStart, buttonPosition
+floatBtn.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingButton = true
+		buttonStart = input.Position
+		buttonPosition = floatBtn.Position
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if not draggingButton then return end
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - buttonStart
+		floatBtn.Position = UDim2.new(buttonPosition.X.Scale, buttonPosition.X.Offset + delta.X, buttonPosition.Y.Scale, buttonPosition.Y.Offset + delta.Y)
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingButton = false
+	end
+end)
+
+--==================================================
+-- ลากหน้าต่างเมนู
+--==================================================
+local draggingMenu = false
+local menuStart, menuPosition
+headerBar.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingMenu = true
+		menuStart = input.Position
+		menuPosition = mainFrame.Position
+	end
+end)
+UserInputService.InputChanged:Connect(function(input)
+	if not draggingMenu then return end
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseMovement then
+		local delta = input.Position - menuStart
+		mainFrame.Position = UDim2.new(menuPosition.X.Scale, menuPosition.X.Offset + delta.X, menuPosition.Y.Scale, menuPosition.Y.Offset + delta.Y)
+	end
+end)
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		draggingMenu = false
+	end
+end)
