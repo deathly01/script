@@ -10,7 +10,7 @@ end
 task.wait(5)
 
 --==================================================
--- // 759 - Full LocalScript (Part 1)
+-- // 759 - Full LocalScript (Part 1/3)
 -- // Roblox Studio > StarterPlayer > StarterPlayerScripts
 --==================================================
 
@@ -694,7 +694,6 @@ task.spawn(function()
 		gameNameLabel.Text = langData.GameNameText .. " " .. tostring(game.PlaceId)
 	end
 end)
-
 --==================================================
 -- MISC TAB
 --==================================================
@@ -1771,7 +1770,7 @@ UserInputService.InputEnded:Connect(function(input)
 end)
 
 --==================================================
--- ลากหน้าต่างเมนู
+-- ลากหน้าต่างเมนู (ส่วนที่ขาดจาก GitHub)
 --==================================================
 local draggingMenu = false
 local menuStart, menuPosition
